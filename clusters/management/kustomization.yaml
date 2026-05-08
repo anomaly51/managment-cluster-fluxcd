@@ -4,5 +4,3 @@ resources:
   - flux-system
   - ../../apps/tekton
   - ../../apps/hello-world-pipeline
-  - ../../apps/capacitor
-
