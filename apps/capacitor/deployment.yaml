@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: capacitor
+  namespace: capacitor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: capacitor
+  template:
+    metadata:
+      labels:
+        app: capacitor
+    spec:
+      serviceAccountName: capacitor
+      containers:
+        - name: capacitor
+          image: ghcr.io/gimlet-io/capacitor:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: PORT
+              value: "3000"

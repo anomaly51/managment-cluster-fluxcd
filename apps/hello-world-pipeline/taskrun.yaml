@@ -1,0 +1,8 @@
+apiVersion: tekton.dev/v1
+kind: TaskRun
+metadata:
+  name: hello-world-run-1
+  namespace: tekton-pipelines
+spec:
+  taskRef:
+    name: hello-world
