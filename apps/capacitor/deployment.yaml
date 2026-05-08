@@ -16,7 +16,7 @@ spec:
       serviceAccountName: capacitor
       containers:
         - name: capacitor
-          image: ghcr.io/gimlet-io/capacitor:v0.14.0
+          image: ghcr.io/gimlet-io/capacitor:0.14.0
           ports:
             - containerPort: 3000
           env:
