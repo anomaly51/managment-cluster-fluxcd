@@ -1,0 +1,20 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: math-pipeline
+  namespace: default
+spec:
+  params:
+    - name: a
+      type: string
+    - name: b
+      type: string
+  tasks:
+    - name: run-math
+      taskRef:
+        name: calculate-sum
+      params:
+        - name: a
+          value: "$(params.a)"
+        - name: b
+          value: "$(params.b)"

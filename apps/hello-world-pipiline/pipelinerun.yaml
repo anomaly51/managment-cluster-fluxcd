@@ -1,0 +1,13 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  name: math-pipeline-run-1
+  namespace: default
+spec:
+  pipelineRef:
+    name: math-pipeline
+  params:
+    - name: a
+      value: "2"
+    - name: b
+      value: "2"
