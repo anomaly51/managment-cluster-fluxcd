@@ -38,8 +38,6 @@ spec:
   tasks:
     - name: provision-cluster
       taskSpec:
-        workspaces:
-          - name: workspace
         steps:
           - name: clone-tf
             image: alpine/git:v2.43.0

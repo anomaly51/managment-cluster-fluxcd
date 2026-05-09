@@ -14,8 +14,6 @@ spec:
   tasks:
     - name: destroy-vm
       taskSpec:
-        workspaces:
-          - name: workspace
         steps:
           - name: clone
             image: alpine/git:v2.43.0

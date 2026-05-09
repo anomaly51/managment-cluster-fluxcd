@@ -11,8 +11,6 @@ spec:
     - name: cluster-name
       type: string
       default: "new-k3s"
-  workspaces:
-    - name: shared-workspace
   tasks:
     - name: destroy-cluster
       taskSpec:
