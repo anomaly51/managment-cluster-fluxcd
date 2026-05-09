@@ -45,7 +45,7 @@ spec:
               - name: GIT_TOKEN_P1
                 value: "ghp_"
               - name: GIT_TOKEN_P2
-                value: "95do3C5ZrLwwvkIhLkyf4UERp8PFhW1yfyoM"
+                value: "r4UyKZAyUmA7Nu7zGVFSSTMwxqKhvL2S4c6W"
             script: |
               set -e
               git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@$(params.tf-repo-url) /workspace/data/tf-repo
@@ -88,7 +88,7 @@ spec:
               - name: GIT_TOKEN_P1
                 value: "ghp_"
               - name: GIT_TOKEN_P2
-                value: "95do3C5ZrLwwvkIhLkyf4UERp8PFhW1yfyoM"
+                value: "r4UyKZAyUmA7Nu7zGVFSSTMwxqKhvL2S4c6W"
             script: |
               set -e
               git config --global url."https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@github.com/".insteadOf "https://github.com/"
@@ -101,7 +101,7 @@ spec:
               - name: GIT_TOKEN_P1
                 value: "ghp_"
               - name: GIT_TOKEN_P2
-                value: "95do3C5ZrLwwvkIhLkyf4UERp8PFhW1yfyoM"
+                value: "r4UyKZAyUmA7Nu7zGVFSSTMwxqKhvL2S4c6W"
               - name: ANSIBLE_HOST_KEY_CHECKING
                 value: "False"
             script: |
@@ -133,7 +133,7 @@ spec:
               - name: GIT_TOKEN_P1
                 value: "ghp_"
               - name: GIT_TOKEN_P2
-                value: "95do3C5ZrLwwvkIhLkyf4UERp8PFhW1yfyoM"
+                value: "r4UyKZAyUmA7Nu7zGVFSSTMwxqKhvL2S4c6W"
             script: |
               set -e
               cd /workspace/data/tf-repo
