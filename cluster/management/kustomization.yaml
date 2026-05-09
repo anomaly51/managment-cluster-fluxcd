@@ -3,5 +3,4 @@ kind: Kustomization
 resources:
   - flux-system
   - ../../apps/tekton
-  - ../../apps/hello-world-pipeline
   - ../../apps/tekton-pipelines
