@@ -4,8 +4,6 @@ metadata:
   name: vm-provision-pipeline
   namespace: default
 spec:
-  workspaces:
-    - name: workspace
   params:
     - name: repo-url
       type: string
@@ -30,12 +28,7 @@ spec:
       default: "debian-base"
   tasks:
     - name: provision-vm
-      workspaces:
-        - name: workspace
-          workspace: workspace
       taskSpec:
-        workspaces:
-          - name: workspace
         steps:
           - name: clone
             image: alpine/git:v2.43.0
@@ -46,13 +39,13 @@ spec:
                 value: "95do3C5ZrLwwvkIhLkyf4UERp8PFhW1yfyoM"
             script: |
               set -e
-              git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@$(params.repo-url) $(workspaces.workspace.path)/repo
+              git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@$(params.repo-url) /workspace/data/repo
           - name: generate
             image: alpine:3.18
             script: |
               set -e
-              mkdir -p $(workspaces.workspace.path)/repo/envs/shared/$(params.vm-name)
-              cat << 'EOF' > $(workspaces.workspace.path)/repo/envs/shared/$(params.vm-name)/main.tf
+              mkdir -p /workspace/data/repo/envs/shared/$(params.vm-name)
+              cat << 'EOF' > /workspace/data/repo/envs/shared/$(params.vm-name)/main.tf
               terraform {
                 required_providers {
                   proxmox = {
@@ -88,7 +81,7 @@ spec:
             script: |
               set -e
               git config --global url."https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@github.com/".insteadOf "https://github.com/"
-              cd $(workspaces.workspace.path)/repo/envs/shared/$(params.vm-name)
+              cd /workspace/data/repo/envs/shared/$(params.vm-name)
               terraform init
               terraform apply -auto-approve
           - name: commit
@@ -100,9 +93,10 @@ spec:
                 value: "95do3C5ZrLwwvkIhLkyf4UERp8PFhW1yfyoM"
             script: |
               set -e
-              cd $(workspaces.workspace.path)/repo
+              cd /workspace/data/repo
               git config --global user.name "Tekton Pipeline"
               git config --global user.email "tekton@devops.local"
               git add envs/shared/$(params.vm-name)/
               git commit -m "feat: terraform apply VM $(params.vm-name)"
               git push origin main
+
