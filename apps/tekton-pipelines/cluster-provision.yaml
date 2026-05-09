@@ -1,0 +1,151 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: cluster-provision-pipeline
+  namespace: default
+spec:
+  params:
+    - name: tf-repo-url
+      type: string
+      default: "github.com/anomaly51/proxmox-vms-terraform.git"
+    - name: ansible-repo-url
+      type: string
+      default: "github.com/anomaly51/ansible-infra.git"
+    - name: cluster-name
+      type: string
+      default: "new-k3s"
+    - name: target-nodes
+      type: string
+      default: '["machine-1", "machine-2"]'
+    - name: template-name
+      type: string
+      default: "debian-k3s"
+    - name: master-count
+      type: string
+      default: "1"
+    - name: worker-count
+      type: string
+      default: "2"
+    - name: cores
+      type: string
+      default: "4"
+    - name: memory
+      type: string
+      default: "4096"
+    - name: disk-size
+      type: string
+      default: "20"
+  workspaces:
+    - name: shared-workspace
+  tasks:
+    - name: provision-cluster
+      workspaces:
+        - name: workspace
+          workspace: shared-workspace
+      taskSpec:
+        workspaces:
+          - name: workspace
+        steps:
+          - name: clone-tf
+            image: alpine/git:v2.43.0
+            env:
+              - name: GIT_TOKEN_P1
+                value: "ghp_"
+              - name: GIT_TOKEN_P2
+                value: "95do3C5ZrLwwvkIhLkyf4UERp8PFhW1yfyoM"
+            script: |
+              set -e
+              git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@$(params.tf-repo-url) $(workspaces.workspace.path)/tf-repo
+          - name: generate-tf
+            image: alpine:3.18
+            script: |
+              set -e
+              mkdir -p $(workspaces.workspace.path)/tf-repo/envs/shared/$(params.cluster-name)
+              cat << 'EOF' > $(workspaces.workspace.path)/tf-repo/envs/shared/$(params.cluster-name)/main.tf
+              terraform {
+                required_providers {
+                  proxmox = {
+                    source  = "telmate/proxmox"
+                    version = "3.0.2-rc07"
+                  }
+                }
+              }
+              provider "proxmox" {
+                pm_api_url          = "https://192.168.1.35:8006/api2/json"
+                pm_api_token_id     = "terraform@pam!terraform"
+                pm_api_token_secret = "bdcbd933-8cbf-4c6c-be85-41b0b8f74ba3"
+                pm_tls_insecure     = true
+                pm_parallel         = 4
+              }
+              module "k3s_cluster" {
+                source        = "../../../modules/k3s-cluster"
+                cluster_name  = "$(params.cluster-name)"
+                proxmox_nodes = $(params.target-nodes)
+                template_name = "$(params.template-name)"
+                master_count  = $(params.master-count)
+                worker_count  = $(params.worker-count)
+                cores         = $(params.cores)
+                memory        = $(params.memory)
+                disk_size     = $(params.disk-size)
+              }
+              EOF
+          - name: apply-tf
+            image: hashicorp/terraform:1.5.7
+            env:
+              - name: GIT_TOKEN_P1
+                value: "ghp_"
+              - name: GIT_TOKEN_P2
+                value: "95do3C5ZrLwwvkIhLkyf4UERp8PFhW1yfyoM"
+            script: |
+              set -e
+              git config --global url."https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@github.com/".insteadOf "https://github.com/"
+              cd $(workspaces.workspace.path)/tf-repo/envs/shared/$(params.cluster-name)
+              terraform init
+              terraform apply -auto-approve
+          - name: run-ansible
+            image: alpine:3.18
+            env:
+              - name: GIT_TOKEN_P1
+                value: "ghp_"
+              - name: GIT_TOKEN_P2
+                value: "95do3C5ZrLwwvkIhLkyf4UERp8PFhW1yfyoM"
+              - name: ANSIBLE_HOST_KEY_CHECKING
+                value: "False"
+            script: |
+              set -e
+              apk add --no-cache git ansible openssh-client py3-pip py3-requests
+              pip3 install proxmoxer --break-system-packages || pip3 install proxmoxer
+              ansible-galaxy collection install community.proxmox
+              mkdir -p ~/.ssh
+              cat << 'EOF' > ~/.ssh/id_ed25519_proxmox-vm
+              -----BEGIN OPENSSH PRIVATE KEY-----
+              b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+              QyNTUxOQAAACD5YK+hwQw+eyIBAEdg/nTJ4/Lv9iLdbqPTpKoH2lUIpwAAAJAa/POCGvzz
+              ggAAAAtzc2gtZWQyNTUxOQAAACD5YK+hwQw+eyIBAEdg/nTJ4/Lv9iLdbqPTpKoH2lUIpw
+              AAAEDIuAdzJk3z34U/O5FvZ4zh2JdiBcj2elF6RNyI0uFG6flgr6HBDD57IgEAR2D+dMnj
+              8u/2It1uo9OkqgfaVQinAAAACnByb3htb3gtdm0BAgM=
+              -----END OPENSSH PRIVATE KEY-----
+              EOF
+              chmod 600 ~/.ssh/id_ed25519_proxmox-vm
+              git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@$(params.ansible-repo-url) $(workspaces.workspace.path)/ansible-repo
+              chmod 755 $(workspaces.workspace.path)/ansible-repo
+              cd $(workspaces.workspace.path)/ansible-repo
+              sleep 45
+              ansible-playbook -i inventory/proxmox.yml playbooks/setup-k3s-cluster.yaml \
+                -e "target_master=~.*$(params.cluster-name)-master.*" \
+                -e "target_workers=~.*$(params.cluster-name)-worker.*"
+          - name: commit-tf
+            image: alpine/git:v2.43.0
+            env:
+              - name: GIT_TOKEN_P1
+                value: "ghp_"
+              - name: GIT_TOKEN_P2
+                value: "95do3C5ZrLwwvkIhLkyf4UERp8PFhW1yfyoM"
+            script: |
+              set -e
+              cd $(workspaces.workspace.path)/tf-repo
+              git config --global user.name "Tekton Pipeline"
+              git config --global user.email "tekton@devops.local"
+              git add envs/shared/$(params.cluster-name)/
+              git commit -m "feat: terraform apply and ansible init K3s cluster $(params.cluster-name)"
+              git push origin main

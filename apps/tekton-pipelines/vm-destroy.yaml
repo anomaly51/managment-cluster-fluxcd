@@ -1,0 +1,62 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: vm-destroy-pipeline
+  namespace: default
+spec:
+  params:
+    - name: repo-url
+      type: string
+      default: "github.com/anomaly51/proxmox-vms-terraform.git"
+    - name: vm-name
+      type: string
+      default: "new-gitops-vm"
+  workspaces:
+    - name: shared-workspace
+  tasks:
+    - name: destroy-vm
+      workspaces:
+        - name: workspace
+          workspace: shared-workspace
+      taskSpec:
+        workspaces:
+          - name: workspace
+        steps:
+          - name: clone
+            image: alpine/git:v2.43.0
+            env:
+              - name: GIT_TOKEN_P1
+                value: "ghp_"
+              - name: GIT_TOKEN_P2
+                value: "95do3C5ZrLwwvkIhLkyf4UERp8PFhW1yfyoM"
+            script: |
+              set -e
+              git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@$(params.repo-url) $(workspaces.workspace.path)/repo
+          - name: destroy
+            image: hashicorp/terraform:1.5.7
+            env:
+              - name: GIT_TOKEN_P1
+                value: "ghp_"
+              - name: GIT_TOKEN_P2
+                value: "95do3C5ZrLwwvkIhLkyf4UERp8PFhW1yfyoM"
+            script: |
+              set -e
+              git config --global url."https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@github.com/".insteadOf "https://github.com/"
+              cd $(workspaces.workspace.path)/repo/envs/shared/$(params.vm-name)
+              terraform init
+              terraform destroy -auto-approve
+          - name: commit
+            image: alpine/git:v2.43.0
+            env:
+              - name: GIT_TOKEN_P1
+                value: "ghp_"
+              - name: GIT_TOKEN_P2
+                value: "95do3C5ZrLwwvkIhLkyf4UERp8PFhW1yfyoM"
+            script: |
+              set -e
+              cd $(workspaces.workspace.path)/repo
+              git config --global user.name "Tekton Pipeline"
+              git config --global user.email "tekton@devops.local"
+              git rm -rf envs/shared/$(params.vm-name)/
+              git commit -m "feat: terraform destroy VM $(params.vm-name) and remove state"
+              git push origin main
