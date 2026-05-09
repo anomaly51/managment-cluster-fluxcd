@@ -4,6 +4,8 @@ metadata:
   name: cluster-destroy-pipeline
   namespace: default
 spec:
+  workspaces:
+    - name: workspace
   params:
     - name: tf-repo-url
       type: string
@@ -13,7 +15,12 @@ spec:
       default: "new-k3s"
   tasks:
     - name: destroy-cluster
+      workspaces:
+        - name: workspace
+          workspace: workspace
       taskSpec:
+        workspaces:
+          - name: workspace
         steps:
           - name: clone
             image: alpine/git:v2.43.0
@@ -53,3 +60,4 @@ spec:
               git rm -rf envs/shared/$(params.cluster-name)/
               git commit -m "feat: terraform destroy K3s cluster $(params.cluster-name)"
               git push origin main
+

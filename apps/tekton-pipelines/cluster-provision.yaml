@@ -4,6 +4,8 @@ metadata:
   name: cluster-provision-pipeline
   namespace: default
 spec:
+  workspaces:
+    - name: workspace
   params:
     - name: tf-repo-url
       type: string
@@ -37,7 +39,12 @@ spec:
       default: "20"
   tasks:
     - name: provision-cluster
+      workspaces:
+        - name: workspace
+          workspace: workspace
       taskSpec:
+        workspaces:
+          - name: workspace
         steps:
           - name: clone-tf
             image: alpine/git:v2.43.0
@@ -142,3 +149,4 @@ spec:
               git add envs/shared/$(params.cluster-name)/
               git commit -m "feat: terraform apply and ansible init K3s cluster $(params.cluster-name)"
               git push origin main
+

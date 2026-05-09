@@ -4,6 +4,8 @@ metadata:
   name: vm-provision-pipeline
   namespace: default
 spec:
+  workspaces:
+    - name: workspace
   params:
     - name: repo-url
       type: string
@@ -28,7 +30,12 @@ spec:
       default: "debian-base"
   tasks:
     - name: provision-vm
+      workspaces:
+        - name: workspace
+          workspace: workspace
       taskSpec:
+        workspaces:
+          - name: workspace
         steps:
           - name: clone
             image: alpine/git:v2.43.0
@@ -99,3 +106,4 @@ spec:
               git add envs/shared/$(params.vm-name)/
               git commit -m "feat: terraform apply VM $(params.vm-name)"
               git push origin main
+
