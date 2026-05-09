@@ -106,4 +106,3 @@ spec:
               git add envs/shared/$(params.vm-name)/
               git commit -m "feat: terraform apply VM $(params.vm-name)"
               git push origin main
-

@@ -4,8 +4,6 @@ metadata:
   name: cluster-provision-pipeline
   namespace: default
 spec:
-  workspaces:
-    - name: workspace
   params:
     - name: tf-repo-url
       type: string
@@ -39,12 +37,7 @@ spec:
       default: "20"
   tasks:
     - name: provision-cluster
-      workspaces:
-        - name: workspace
-          workspace: workspace
       taskSpec:
-        workspaces:
-          - name: workspace
         steps:
           - name: clone-tf
             image: alpine/git:v2.43.0
@@ -55,13 +48,13 @@ spec:
                 value: "95do3C5ZrLwwvkIhLkyf4UERp8PFhW1yfyoM"
             script: |
               set -e
-              git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@$(params.tf-repo-url) $(workspaces.workspace.path)/tf-repo
+              git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@$(params.tf-repo-url) /workspace/data/tf-repo
           - name: generate-tf
             image: alpine:3.18
             script: |
               set -e
-              mkdir -p $(workspaces.workspace.path)/tf-repo/envs/shared/$(params.cluster-name)
-              cat << 'EOF' > $(workspaces.workspace.path)/tf-repo/envs/shared/$(params.cluster-name)/main.tf
+              mkdir -p /workspace/data/tf-repo/envs/shared/$(params.cluster-name)
+              cat << 'EOF' > /workspace/data/tf-repo/envs/shared/$(params.cluster-name)/main.tf
               terraform {
                 required_providers {
                   proxmox = {
@@ -99,7 +92,7 @@ spec:
             script: |
               set -e
               git config --global url."https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@github.com/".insteadOf "https://github.com/"
-              cd $(workspaces.workspace.path)/tf-repo/envs/shared/$(params.cluster-name)
+              cd /workspace/data/tf-repo/envs/shared/$(params.cluster-name)
               terraform init
               terraform apply -auto-approve
           - name: run-ansible
@@ -127,9 +120,9 @@ spec:
               -----END OPENSSH PRIVATE KEY-----
               EOF
               chmod 600 ~/.ssh/id_ed25519_proxmox-vm
-              git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@$(params.ansible-repo-url) $(workspaces.workspace.path)/ansible-repo
-              chmod 755 $(workspaces.workspace.path)/ansible-repo
-              cd $(workspaces.workspace.path)/ansible-repo
+              git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@$(params.ansible-repo-url) /workspace/data/ansible-repo
+              chmod 755 /workspace/data/ansible-repo
+              cd /workspace/data/ansible-repo
               sleep 45
               ansible-playbook -i inventory/proxmox.yml playbooks/setup-k3s-cluster.yaml \
                 -e "target_master=~.*$(params.cluster-name)-master.*" \
@@ -143,7 +136,7 @@ spec:
                 value: "95do3C5ZrLwwvkIhLkyf4UERp8PFhW1yfyoM"
             script: |
               set -e
-              cd $(workspaces.workspace.path)/tf-repo
+              cd /workspace/data/tf-repo
               git config --global user.name "Tekton Pipeline"
               git config --global user.email "tekton@devops.local"
               git add envs/shared/$(params.cluster-name)/
