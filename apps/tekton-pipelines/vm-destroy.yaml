@@ -11,13 +11,8 @@ spec:
     - name: vm-name
       type: string
       default: "new-gitops-vm"
-  workspaces:
-    - name: shared-workspace
   tasks:
     - name: destroy-vm
-      workspaces:
-        - name: workspace
-          workspace: shared-workspace
       taskSpec:
         workspaces:
           - name: workspace

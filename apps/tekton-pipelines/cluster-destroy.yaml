@@ -15,12 +15,7 @@ spec:
     - name: shared-workspace
   tasks:
     - name: destroy-cluster
-      workspaces:
-        - name: workspace
-          workspace: shared-workspace
       taskSpec:
-        workspaces:
-          - name: workspace
         steps:
           - name: clone
             image: alpine/git:v2.43.0
@@ -60,4 +55,3 @@ spec:
               git rm -rf envs/shared/$(params.cluster-name)/
               git commit -m "feat: terraform destroy K3s cluster $(params.cluster-name)"
               git push origin main
-

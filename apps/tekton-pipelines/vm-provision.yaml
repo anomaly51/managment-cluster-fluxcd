@@ -26,13 +26,8 @@ spec:
     - name: template-name
       type: string
       default: "debian-base"
-  workspaces:
-    - name: shared-workspace
   tasks:
     - name: provision-vm
-      workspaces:
-        - name: workspace
-          workspace: shared-workspace
       taskSpec:
         workspaces:
           - name: workspace

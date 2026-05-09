@@ -35,13 +35,8 @@ spec:
     - name: disk-size
       type: string
       default: "20"
-  workspaces:
-    - name: shared-workspace
   tasks:
     - name: provision-cluster
-      workspaces:
-        - name: workspace
-          workspace: shared-workspace
       taskSpec:
         workspaces:
           - name: workspace
