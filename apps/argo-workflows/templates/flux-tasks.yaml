@@ -9,7 +9,6 @@ spec:
       inputs:
         parameters:
           - name: cluster-name
-          - name: github-owner
           - name: repo-name
           - name: master-node-ip
       script:
@@ -23,7 +22,6 @@ spec:
         source: |
           set -e
           apk add --no-cache curl openssh-client
-          # Fetch Kubeconfig via k3sup
           curl -sLS https://get.k3sup.dev | sh
           mkdir -p ~/.ssh
           cat << 'EOF' > ~/.ssh/id_ed25519
@@ -38,12 +36,11 @@ spec:
           chmod 600 ~/.ssh/id_ed25519
           k3sup install --skip-install --host {{inputs.parameters.master-node-ip}} --user root --ssh-key ~/.ssh/id_ed25519 --local-path /workspace/kubeconfig --context {{inputs.parameters.cluster-name}}
 
-          # Flux Bootstrap
           export KUBECONFIG=/workspace/kubeconfig
           export GITHUB_TOKEN="${GIT_TOKEN_P1}${GIT_TOKEN_P2}"
           curl -s https://fluxcd.io/install.sh | bash
           flux bootstrap github \
-            --owner={{inputs.parameters.github-owner}} \
+            --owner=anomaly51 \
             --repository={{inputs.parameters.repo-name}} \
             --branch=main \
             --path=./cluster \
@@ -51,3 +48,4 @@ spec:
         volumeMounts:
           - name: workspace
             mountPath: /workspace
+

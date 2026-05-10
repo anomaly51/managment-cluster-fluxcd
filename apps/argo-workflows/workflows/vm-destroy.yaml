@@ -7,8 +7,6 @@ spec:
   entrypoint: main
   arguments:
     parameters:
-      - name: repo-url
-        value: "github.com/anomaly51/proxmox-vms-terraform.git"
       - name: vm-name
         value: "new-gitops-vm"
   volumeClaimTemplates:
@@ -26,20 +24,16 @@ spec:
             templateRef: { name: git-tasks, template: clone-repo }
             arguments:
               parameters:
-                [
-                  { name: repo-url, value: "{{workflow.parameters.repo-url}}" },
-                  { name: dest-path, value: "/workspace/repo" },
-                ]
+                - name: repo-url
+                  value: "github.com/anomaly51/proxmox-vms-terraform.git"
+                - name: dest-path
+                  value: "/workspace/repo"
         - - name: destroy
             templateRef: { name: tf-tasks, template: destroy-tf }
             arguments:
               parameters:
-                [
-                  {
-                    name: tf-dir,
-                    value: "/workspace/repo/envs/shared/{{workflow.parameters.vm-name}}",
-                  },
-                ]
+                - name: tf-dir
+                  value: "/workspace/repo/envs/shared/{{workflow.parameters.vm-name}}"
         - - name: commit
             templateRef: { name: git-tasks, template: commit-changes }
             arguments:
@@ -50,3 +44,4 @@ spec:
                   value: "envs/shared/{{workflow.parameters.vm-name}}/"
                 - name: commit-message
                   value: "feat: terraform destroy VM {{workflow.parameters.vm-name}}"
+

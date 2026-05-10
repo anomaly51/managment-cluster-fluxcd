@@ -10,7 +10,6 @@ spec:
         parameters:
           - name: cluster-name
           - name: target-nodes
-          - name: template-name
           - name: master-count
           - name: worker-count
           - name: cores
@@ -42,7 +41,7 @@ spec:
             source        = "../../../modules/k3s-cluster"
             cluster_name  = "{{inputs.parameters.cluster-name}}"
             proxmox_nodes = {{inputs.parameters.target-nodes}}
-            template_name = "{{inputs.parameters.template-name}}"
+            template_name = "debian-k3s"
             master_count  = {{inputs.parameters.master-count}}
             worker_count  = {{inputs.parameters.worker-count}}
             cores         = {{inputs.parameters.cores}}
@@ -59,7 +58,6 @@ spec:
         parameters:
           - name: vm-name
           - name: target-node
-          - name: template-name
           - name: cores
           - name: memory
           - name: disk-size
@@ -88,7 +86,7 @@ spec:
             source          = "../../../modules/vm"
             name            = "{{inputs.parameters.vm-name}}"
             description     = "Provisioned via Argo Workflow"
-            template_name   = "{{inputs.parameters.template-name}}"
+            template_name   = "debian-base"
             target_node     = "{{inputs.parameters.target-node}}"
             cores           = {{inputs.parameters.cores}}
             memory          = {{inputs.parameters.memory}}
@@ -144,3 +142,4 @@ spec:
         volumeMounts:
           - name: workspace
             mountPath: /workspace
+

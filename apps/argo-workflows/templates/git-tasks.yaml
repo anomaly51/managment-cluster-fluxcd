@@ -33,8 +33,6 @@ spec:
           - name: cluster-name
           - name: template-url
             default: "github.com/anomaly51/gitops-template-fluxcd.git"
-          - name: github-owner
-            default: "anomaly51"
       outputs:
         parameters:
           - name: repo-name
@@ -53,7 +51,7 @@ spec:
           apk add --no-cache curl
           FULL_TOKEN="${GIT_TOKEN_P1}${GIT_TOKEN_P2}"
           NEW_REPO_NAME="{{inputs.parameters.cluster-name}}-gitops"
-          curl -s -X POST -H "Authorization: token $FULL_TOKEN" -d "{\"name\":\"${NEW_REPO_NAME}\", \"private\": true}" https://api.github.com/orgs/{{inputs.parameters.github-owner}}/repos
+          curl -s -X POST -H "Authorization: token $FULL_TOKEN" -d "{\"name\":\"${NEW_REPO_NAME}\", \"private\": true}" https://api.github.com/orgs/anomaly51/repos
           git clone https://${FULL_TOKEN}@{{inputs.parameters.template-url}} /workspace/template-repo
           cd /workspace/template-repo
           rm -rf .git
@@ -64,7 +62,7 @@ spec:
           git config --global user.email "tekton@devops.local"
           git add .
           git commit -m "chore: initialize cluster {{inputs.parameters.cluster-name}} from template"
-          git remote add origin https://${FULL_TOKEN}@github.com/{{inputs.parameters.github-owner}}/${NEW_REPO_NAME}.git
+          git remote add origin https://${FULL_TOKEN}@github.com/anomaly51/${NEW_REPO_NAME}.git
           git push -u origin main
           echo -n "${NEW_REPO_NAME}" > /workspace/repo-name.txt
         volumeMounts:
@@ -97,3 +95,4 @@ spec:
         volumeMounts:
           - name: workspace
             mountPath: /workspace
+

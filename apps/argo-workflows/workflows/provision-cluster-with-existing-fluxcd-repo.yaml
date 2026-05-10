@@ -8,16 +8,10 @@ spec:
   onExit: cleanup
   arguments:
     parameters:
-      - name: tf-repo-url
-        value: "github.com/anomaly51/proxmox-vms-terraform.git"
-      - name: ansible-repo-url
-        value: "github.com/anomaly51/ansible-infra.git"
       - name: cluster-name
         value: "new-k3s"
       - name: target-nodes
         value: '["machine-1", "machine-2"]'
-      - name: template-name
-        value: "debian-k3s"
       - name: master-count
         value: "1"
       - name: worker-count
@@ -28,8 +22,6 @@ spec:
         value: "4096"
       - name: disk-size
         value: "20"
-      - name: github-owner
-        value: "anomaly51"
       - name: repo-name
         value: "existing-repo"
   volumeClaimTemplates:
@@ -48,13 +40,10 @@ spec:
             templateRef: { name: git-tasks, template: clone-repo }
             arguments:
               parameters:
-                [
-                  {
-                    name: repo-url,
-                    value: "{{workflow.parameters.tf-repo-url}}",
-                  },
-                  { name: dest-path, value: "/workspace/tf-repo" },
-                ]
+                - name: repo-url
+                  value: "github.com/anomaly51/proxmox-vms-terraform.git"
+                - name: dest-path
+                  value: "/workspace/tf-repo"
 
           - name: generate-tf
             dependencies: [clone-tf]
@@ -65,8 +54,6 @@ spec:
                   value: "{{workflow.parameters.cluster-name}}"
                 - name: target-nodes
                   value: "{{workflow.parameters.target-nodes}}"
-                - name: template-name
-                  value: "{{workflow.parameters.template-name}}"
                 - name: master-count
                   value: "{{workflow.parameters.master-count}}"
                 - name: worker-count
@@ -83,20 +70,14 @@ spec:
             templateRef: { name: tf-tasks, template: apply-tf }
             arguments:
               parameters:
-                [
-                  {
-                    name: tf-dir,
-                    value: "/workspace/tf-repo/envs/shared/{{workflow.parameters.cluster-name}}",
-                  },
-                ]
+                - name: tf-dir
+                  value: "/workspace/tf-repo/envs/shared/{{workflow.parameters.cluster-name}}"
 
           - name: run-ansible
             dependencies: [apply-tf]
             templateRef: { name: ansible-tasks, template: run-k3s-setup }
             arguments:
               parameters:
-                - name: ansible-repo-url
-                  value: "{{workflow.parameters.ansible-repo-url}}"
                 - name: cluster-name
                   value: "{{workflow.parameters.cluster-name}}"
 
@@ -107,8 +88,6 @@ spec:
               parameters:
                 - name: cluster-name
                   value: "{{workflow.parameters.cluster-name}}"
-                - name: github-owner
-                  value: "{{workflow.parameters.github-owner}}"
                 - name: repo-name
                   value: "{{workflow.parameters.repo-name}}"
                 - name: master-node-ip
@@ -132,13 +111,13 @@ spec:
             templateRef:
               name: cleanup-tasks
               template: cleanup-on-failure
-            when: "{{workflow.status}} == Failed"
+            when: "{{workflow.status}} == 'Failed'"
             arguments:
               parameters:
                 - name: cluster-name
                   value: "{{workflow.parameters.cluster-name}}"
-                - name: github-owner
-                  value: "{{workflow.parameters.github-owner}}"
                 - name: repo-name
-                  value: "{{workflow.parameters.cluster-name}}-gitops"
+                  value: "{{workflow.parameters.repo-name}}"
+                - name: delete-repo
+                  value: "false"
 

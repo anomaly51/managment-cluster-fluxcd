@@ -8,7 +8,6 @@ spec:
     - name: run-k3s-setup
       inputs:
         parameters:
-          - name: ansible-repo-url
           - name: cluster-name
       outputs:
         parameters:
@@ -41,7 +40,7 @@ spec:
           -----END OPENSSH PRIVATE KEY-----
           EOF
           chmod 600 ~/.ssh/id_ed25519_proxmox-vm
-          git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@{{inputs.parameters.ansible-repo-url}} /workspace/ansible-repo
+          git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@github.com/anomaly51/ansible-infra.git /workspace/ansible-repo
           cd /workspace/ansible-repo
           sleep 45
           ansible-playbook -i inventory/proxmox.yml playbooks/setup-k3s-cluster.yaml \
@@ -52,3 +51,4 @@ spec:
         volumeMounts:
           - name: workspace
             mountPath: /workspace
+

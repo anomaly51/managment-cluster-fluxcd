@@ -9,7 +9,6 @@ spec:
       inputs:
         parameters:
           - name: cluster-name
-          - name: github-owner
           - name: repo-name
           - name: delete-repo
             default: "true"
@@ -27,15 +26,12 @@ spec:
             when: "{{inputs.parameters.delete-repo}} == true"
             arguments:
               parameters:
-                - name: github-owner
-                  value: "{{inputs.parameters.github-owner}}"
                 - name: repo-name
                   value: "{{inputs.parameters.repo-name}}"
 
     - name: delete-github-repo
       inputs:
         parameters:
-          - name: github-owner
           - name: repo-name
       script:
         image: alpine:3.18
@@ -49,7 +45,8 @@ spec:
           set -e
           apk add --no-cache curl
           FULL_TOKEN="${GIT_TOKEN_P1}${GIT_TOKEN_P2}"
-          curl -s -o /dev/null -w "%{http_code}" -X DELETE -H "Authorization: token $FULL_TOKEN" https://api.github.com/repos/{{inputs.parameters.github-owner}}/{{inputs.parameters.repo-name}}
+          curl -s -o /dev/null -w "%{http_code}" -X DELETE -H "Authorization: token $FULL_TOKEN" https://api.github.com/repos/anomaly51/{{inputs.parameters.repo-name}}
         volumeMounts:
           - name: workspace
             mountPath: /workspace
+

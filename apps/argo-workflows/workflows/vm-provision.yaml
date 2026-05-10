@@ -7,8 +7,6 @@ spec:
   entrypoint: main
   arguments:
     parameters:
-      - name: repo-url
-        value: "github.com/anomaly51/proxmox-vms-terraform.git"
       - name: vm-name
         value: "new-gitops-vm"
       - name: target-node
@@ -19,8 +17,6 @@ spec:
         value: "4096"
       - name: disk-size
         value: "20"
-      - name: template-name
-        value: "debian-base"
   volumeClaimTemplates:
     - metadata:
         name: workspace
@@ -36,10 +32,10 @@ spec:
             templateRef: { name: git-tasks, template: clone-repo }
             arguments:
               parameters:
-                [
-                  { name: repo-url, value: "{{workflow.parameters.repo-url}}" },
-                  { name: dest-path, value: "/workspace/repo" },
-                ]
+                - name: repo-url
+                  value: "github.com/anomaly51/proxmox-vms-terraform.git"
+                - name: dest-path
+                  value: "/workspace/repo"
         - - name: generate
             templateRef: { name: tf-tasks, template: generate-tf-vm }
             arguments:
@@ -48,8 +44,6 @@ spec:
                   value: "{{workflow.parameters.vm-name}}"
                 - name: target-node
                   value: "{{workflow.parameters.target-node}}"
-                - name: template-name
-                  value: "{{workflow.parameters.template-name}}"
                 - name: cores
                   value: "{{workflow.parameters.cores}}"
                 - name: memory
@@ -60,12 +54,8 @@ spec:
             templateRef: { name: tf-tasks, template: apply-tf }
             arguments:
               parameters:
-                [
-                  {
-                    name: tf-dir,
-                    value: "/workspace/repo/envs/shared/{{workflow.parameters.vm-name}}",
-                  },
-                ]
+                - name: tf-dir
+                  value: "/workspace/repo/envs/shared/{{workflow.parameters.vm-name}}"
         - - name: commit
             templateRef: { name: git-tasks, template: commit-changes }
             arguments:

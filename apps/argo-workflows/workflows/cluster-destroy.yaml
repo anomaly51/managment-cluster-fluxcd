@@ -7,8 +7,6 @@ spec:
   entrypoint: main
   arguments:
     parameters:
-      - name: tf-repo-url
-        value: "github.com/anomaly51/proxmox-vms-terraform.git"
       - name: cluster-name
         value: "new-k3s"
   volumeClaimTemplates:
@@ -26,23 +24,16 @@ spec:
             templateRef: { name: git-tasks, template: clone-repo }
             arguments:
               parameters:
-                [
-                  {
-                    name: repo-url,
-                    value: "{{workflow.parameters.tf-repo-url}}",
-                  },
-                  { name: dest-path, value: "/workspace/repo" },
-                ]
+                - name: repo-url
+                  value: "github.com/anomaly51/proxmox-vms-terraform.git"
+                - name: dest-path
+                  value: "/workspace/repo"
         - - name: destroy
             templateRef: { name: tf-tasks, template: destroy-tf }
             arguments:
               parameters:
-                [
-                  {
-                    name: tf-dir,
-                    value: "/workspace/repo/envs/shared/{{workflow.parameters.cluster-name}}",
-                  },
-                ]
+                - name: tf-dir
+                  value: "/workspace/repo/envs/shared/{{workflow.parameters.cluster-name}}"
         - - name: commit
             templateRef: { name: git-tasks, template: commit-changes }
             arguments:
