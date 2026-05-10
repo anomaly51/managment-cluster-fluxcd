@@ -206,7 +206,7 @@ spec:
                   --repository={{inputs.parameters.cluster-name}}-fluxcd \
                   --branch=main \
                   --path=cluster \
-                  --personal=false \
+                  --personal=true \
                   --token-auth
 
           - name: commit-tf
