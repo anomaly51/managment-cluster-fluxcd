@@ -28,7 +28,9 @@ spec:
         apk add --no-cache curl
         FULL_TOKEN="${GIT_TOKEN_P1}${GIT_TOKEN_P2}"
         NEW_REPO_NAME="$(params.cluster-name)-gitops"
-        curl -s -X POST -H "Authorization: token $FULL_TOKEN" -d "{\"name\":\"${NEW_REPO_NAME}\", \"private\": true}" https://api.github.com/user/repos
+        
+        curl -s -X POST -H "Authorization: token $FULL_TOKEN" -d "{\"name\":\"${NEW_REPO_NAME}\", \"private\": true}" https://api.github.com/orgs/$(params.github-owner)/repos
+        
         git clone https://${FULL_TOKEN}@$(params.template-url) /workspace/template-repo
         cd /workspace/template-repo
         rm -rf .git
