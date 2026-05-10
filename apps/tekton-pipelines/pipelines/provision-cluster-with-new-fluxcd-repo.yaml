@@ -4,8 +4,6 @@ metadata:
   name: provision-cluster-with-new-fluxcd-repo
   namespace: default
 spec:
-  workspaces:
-    - name: shared-data
   params:
     - name: tf-repo-url
       type: string
@@ -44,10 +42,9 @@ spec:
     - name: provision-infra
       taskRef:
         name: infra-provision
-      workspaces:
-        - name: shared-data
-          workspace: shared-data
       params:
+        - name: run-id
+          value: $(context.pipelineRun.name)
         - name: tf-repo-url
           value: $(params.tf-repo-url)
         - name: ansible-repo-url
@@ -99,27 +96,23 @@ spec:
         name: tf-commit
       runAfter:
         - bootstrap-fluxcd
-      workspaces:
-        - name: shared-data
-          workspace: shared-data
       params:
+        - name: run-id
+          value: $(context.pipelineRun.name)
         - name: cluster-name
           value: $(params.cluster-name)
 
-  # Блок finally выполнится в любом случае по завершению pipeline
   finally:
     - name: cleanup-on-failure
-      # Но запустим мы cleanup ТОЛЬКО если пайплайн упал
       when:
         - input: "$(tasks.status)"
           operator: in
           values: ["Failed"]
       taskRef:
         name: cleanup-on-failure
-      workspaces:
-        - name: shared-data
-          workspace: shared-data
       params:
+        - name: run-id
+          value: $(context.pipelineRun.name)
         - name: cluster-name
           value: $(params.cluster-name)
         - name: github-owner

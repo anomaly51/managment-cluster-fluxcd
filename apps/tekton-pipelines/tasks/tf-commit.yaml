@@ -5,10 +5,19 @@ metadata:
   namespace: default
 spec:
   params:
+    - name: run-id
+      type: string
     - name: cluster-name
       type: string
-  workspaces:
+  volumes:
     - name: shared-data
+      persistentVolumeClaim:
+        claimName: tekton-shared-pvc
+  stepTemplate:
+    volumeMounts:
+      - name: shared-data
+        mountPath: /workspace/shared-data
+        subPath: $(params.run-id)
   steps:
     - name: commit-and-push
       image: alpine/git:v2.43.0
@@ -19,7 +28,7 @@ spec:
           value: "r4UyKZAyUmA7Nu7zGVFSSTMwxqKhvL2S4c6W"
       script: |
         set -e
-        cd $(workspaces.shared-data.path)/tf-repo
+        cd /workspace/shared-data/tf-repo
         git config --global user.name "Tekton Pipeline"
         git config --global user.email "tekton@devops.local"
         git add envs/shared/$(params.cluster-name)/

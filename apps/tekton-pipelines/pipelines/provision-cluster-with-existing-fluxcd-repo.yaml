@@ -4,8 +4,6 @@ metadata:
   name: provision-cluster-with-existing-fluxcd-repo
   namespace: default
 spec:
-  workspaces:
-    - name: shared-data
   params:
     - name: tf-repo-url
       type: string
@@ -46,10 +44,9 @@ spec:
     - name: provision-infra
       taskRef:
         name: infra-provision
-      workspaces:
-        - name: shared-data
-          workspace: shared-data
       params:
+        - name: run-id
+          value: $(context.pipelineRun.name)
         - name: tf-repo-url
           value: $(params.tf-repo-url)
         - name: ansible-repo-url
@@ -91,10 +88,9 @@ spec:
         name: tf-commit
       runAfter:
         - bootstrap-fluxcd
-      workspaces:
-        - name: shared-data
-          workspace: shared-data
       params:
+        - name: run-id
+          value: $(context.pipelineRun.name)
         - name: cluster-name
           value: $(params.cluster-name)
 
@@ -106,10 +102,9 @@ spec:
           values: ["Failed"]
       taskRef:
         name: cleanup-on-failure
-      workspaces:
-        - name: shared-data
-          workspace: shared-data
       params:
+        - name: run-id
+          value: $(context.pipelineRun.name)
         - name: cluster-name
           value: $(params.cluster-name)
         - name: github-owner
@@ -117,5 +112,5 @@ spec:
         - name: repo-name
           value: $(params.repo-name)
         - name: delete-repo
-          value: "false" # ВАЖНО: Не удаляем существующий репозиторий!
+          value: "false"
 

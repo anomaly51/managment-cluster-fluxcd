@@ -4,9 +4,9 @@ metadata:
   name: infra-provision
   namespace: default
 spec:
-  workspaces:
-    - name: shared-data
   params:
+    - name: run-id
+      type: string
     - name: tf-repo-url
       type: string
       default: "github.com/anomaly51/proxmox-vms-terraform.git"
@@ -39,6 +39,15 @@ spec:
       default: "20"
   results:
     - name: master-node-ip
+  volumes:
+    - name: shared-data
+      persistentVolumeClaim:
+        claimName: tekton-shared-pvc
+  stepTemplate:
+    volumeMounts:
+      - name: shared-data
+        mountPath: /workspace/shared-data
+        subPath: $(params.run-id)
   steps:
     - name: clone-tf
       image: alpine/git:v2.43.0
@@ -49,14 +58,14 @@ spec:
           value: "r4UyKZAyUmA7Nu7zGVFSSTMwxqKhvL2S4c6W"
       script: |
         set -e
-        rm -rf $(workspaces.shared-data.path)/tf-repo
-        git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@$(params.tf-repo-url) $(workspaces.shared-data.path)/tf-repo
+        rm -rf /workspace/shared-data/tf-repo
+        git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@$(params.tf-repo-url) /workspace/shared-data/tf-repo
     - name: generate-tf
       image: alpine:3.18
       script: |
         set -e
-        mkdir -p $(workspaces.shared-data.path)/tf-repo/envs/shared/$(params.cluster-name)
-        cat << 'EOF' > $(workspaces.shared-data.path)/tf-repo/envs/shared/$(params.cluster-name)/main.tf
+        mkdir -p /workspace/shared-data/tf-repo/envs/shared/$(params.cluster-name)
+        cat << 'EOF' > /workspace/shared-data/tf-repo/envs/shared/$(params.cluster-name)/main.tf
         terraform {
           required_providers {
             proxmox = {
@@ -94,7 +103,7 @@ spec:
       script: |
         set -e
         git config --global url."https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@github.com/".insteadOf "https://github.com/"
-        cd $(workspaces.shared-data.path)/tf-repo/envs/shared/$(params.cluster-name)
+        cd /workspace/shared-data/tf-repo/envs/shared/$(params.cluster-name)
         terraform init
         terraform apply -auto-approve
     - name: run-ansible
