@@ -1,3 +1,4 @@
+# managment-cluster-fluxcd/apps/argo-workflows/workflows/vm-destroy-template.yaml
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
@@ -27,9 +28,9 @@ spec:
             image: alpine/git:v2.43.0
             env:
               - name: GIT_TOKEN_P1
-                value: "ghp_"
+                value: "ghp_qtjRu"
               - name: GIT_TOKEN_P2
-                value: "r4UyKZAyUmA7Nu7zGVFSSTMwxqKhvL2S4c6W"
+                value: "KAsWgmy8NFrTAdgTMzxzCIFC31EI8a7"
             command: [sh, -c]
             args:
               - |
@@ -40,9 +41,9 @@ spec:
             image: hashicorp/terraform:1.5.7
             env:
               - name: GIT_TOKEN_P1
-                value: "ghp_"
+                value: "ghp_qtjRu"
               - name: GIT_TOKEN_P2
-                value: "r4UyKZAyUmA7Nu7zGVFSSTMwxqKhvL2S4c6W"
+                value: "KAsWgmy8NFrTAdgTMzxzCIFC31EI8a7"
             command: [sh, -c]
             args:
               - |
@@ -56,9 +57,9 @@ spec:
             image: alpine/git:v2.43.0
             env:
               - name: GIT_TOKEN_P1
-                value: "ghp_"
+                value: "ghp_qtjRu"
               - name: GIT_TOKEN_P2
-                value: "r4UyKZAyUmA7Nu7zGVFSSTMwxqKhvL2S4c6W"
+                value: "KAsWgmy8NFrTAdgTMzxzCIFC31EI8a7"
             command: [sh, -c]
             args:
               - |
