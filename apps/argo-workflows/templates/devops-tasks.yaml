@@ -21,7 +21,7 @@ spec:
         parameters:
           - name: master-node-ip
             valueFrom:
-              path: /workspace/master-node-ip.txt
+              parameter: "{{steps.run-ansible.outputs.parameters.master-node-ip}}"
       steps:
         - - name: clone-tf
             template: infra-clone-tf
@@ -160,6 +160,11 @@ spec:
         parameters:
           - name: ansible-repo-url
           - name: cluster-name
+      outputs:
+        parameters:
+          - name: master-node-ip
+            valueFrom:
+              path: /workspace/master-node-ip.txt
       script:
         image: alpine:3.18
         command: [sh]
@@ -424,3 +429,4 @@ spec:
       volumeMounts:
         - name: workspace
           mountPath: /workspace
+
