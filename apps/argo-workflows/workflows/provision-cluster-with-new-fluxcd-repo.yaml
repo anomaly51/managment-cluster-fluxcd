@@ -42,7 +42,6 @@ spec:
                   value: "github.com/anomaly51/proxmox-vms-terraform.git"
                 - name: dest-path
                   value: "/workspace/tf-repo"
-
           - name: generate-tf
             dependencies: [clone-tf]
             templateRef: { name: tf-tasks, template: generate-tf-cluster }
@@ -62,7 +61,6 @@ spec:
                   value: "{{workflow.parameters.memory}}"
                 - name: disk-size
                   value: "{{workflow.parameters.disk-size}}"
-
           - name: apply-tf
             dependencies: [generate-tf]
             templateRef: { name: tf-tasks, template: apply-tf }
@@ -70,7 +68,6 @@ spec:
               parameters:
                 - name: tf-dir
                   value: "/workspace/tf-repo/envs/shared/{{workflow.parameters.cluster-name}}"
-
           - name: run-ansible
             dependencies: [apply-tf]
             templateRef: { name: ansible-tasks, template: run-k3s-setup }
@@ -78,14 +75,13 @@ spec:
               parameters:
                 - name: cluster-name
                   value: "{{workflow.parameters.cluster-name}}"
-
           - name: create-gitops-repo
+            dependencies: [run-ansible]
             templateRef: { name: git-tasks, template: create-gitops-repo }
             arguments:
               parameters:
                 - name: cluster-name
                   value: "{{workflow.parameters.cluster-name}}"
-
           - name: bootstrap-fluxcd
             dependencies: [run-ansible, create-gitops-repo]
             templateRef: { name: flux-tasks, template: bootstrap }
@@ -97,7 +93,6 @@ spec:
                   value: "{{tasks.create-gitops-repo.outputs.parameters.repo-name}}"
                 - name: master-node-ip
                   value: "{{tasks.run-ansible.outputs.parameters.master-node-ip}}"
-
           - name: commit-tf-state
             dependencies: [bootstrap-fluxcd]
             templateRef: { name: git-tasks, template: commit-changes }
@@ -109,7 +104,6 @@ spec:
                   value: "envs/shared/{{workflow.parameters.cluster-name}}/"
                 - name: commit-message
                   value: "feat: terraform apply K3s cluster {{workflow.parameters.cluster-name}}"
-
     - name: cleanup
       steps:
         - - name: execute-cleanup

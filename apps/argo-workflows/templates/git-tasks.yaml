@@ -58,8 +58,8 @@ spec:
           find . -type f -name "*.yaml" -exec sed -i "s/{{CLUSTER_NAME}}/{{inputs.parameters.cluster-name}}/g" {} +
           git init
           git branch -M main
-          git config --global user.name "Tekton Pipeline"
-          git config --global user.email "tekton@devops.local"
+          git config --global user.name "Argo Workflow"
+          git config --global user.email "argo@devops.local"
           git add .
           git commit -m "chore: initialize cluster {{inputs.parameters.cluster-name}} from template"
           git remote add origin https://${FULL_TOKEN}@github.com/anomaly51/${NEW_REPO_NAME}.git
