@@ -1,8 +1,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: argo-workflows
+
 resources:
-  - base/
-  - templates/
-  - workflows/
-  - https://github.com/argoproj/argo-workflows/releases/download/v3.5.5/install.yaml
+  - cluster-destroy.yaml
+  - provision-cluster-with-existing-fluxcd-repo.yaml
+  - provision-cluster-with-new-fluxcd-repo.yaml
+  - vm-destroy.yaml
+  - vm-provision.yaml
+
