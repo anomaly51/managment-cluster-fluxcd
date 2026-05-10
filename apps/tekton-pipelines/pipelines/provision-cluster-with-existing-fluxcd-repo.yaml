@@ -1,0 +1,79 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: provision-cluster-with-existing-fluxcd-repo
+  namespace: default
+spec:
+  params:
+    - name: tf-repo-url
+      type: string
+      default: "github.com/anomaly51/proxmox-vms-terraform.git"
+    - name: ansible-repo-url
+      type: string
+      default: "github.com/anomaly51/ansible-infra.git"
+    - name: cluster-name
+      type: string
+      default: "new-k3s"
+    - name: target-nodes
+      type: string
+      default: '["machine-1", "machine-2"]'
+    - name: template-name
+      type: string
+      default: "debian-k3s"
+    - name: master-count
+      type: string
+      default: "1"
+    - name: worker-count
+      type: string
+      default: "2"
+    - name: cores
+      type: string
+      default: "4"
+    - name: memory
+      type: string
+      default: "4096"
+    - name: disk-size
+      type: string
+      default: "20"
+    - name: github-owner
+      type: string
+      default: "anomaly51"
+    - name: repo-name
+      type: string
+  tasks:
+    - name: provision-infra
+      taskRef:
+        name: infra-provision
+      params:
+        - name: tf-repo-url
+          value: $(params.tf-repo-url)
+        - name: ansible-repo-url
+          value: $(params.ansible-repo-url)
+        - name: cluster-name
+          value: $(params.cluster-name)
+        - name: target-nodes
+          value: $(params.target-nodes)
+        - name: template-name
+          value: $(params.template-name)
+        - name: master-count
+          value: $(params.master-count)
+        - name: worker-count
+          value: $(params.worker-count)
+        - name: cores
+          value: $(params.cores)
+        - name: memory
+          value: $(params.memory)
+        - name: disk-size
+          value: $(params.disk-size)
+    - name: bootstrap-fluxcd
+      taskRef:
+        name: fluxcd-bootstrap
+      runAfter:
+        - provision-infra
+      params:
+        - name: cluster-name
+          value: $(params.cluster-name)
+        - name: github-owner
+          value: $(params.github-owner)
+        - name: repo-name
+          value: $(params.repo-name)

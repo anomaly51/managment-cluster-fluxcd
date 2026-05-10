@@ -53,4 +53,3 @@ spec:
               git rm -rf envs/shared/$(params.cluster-name)/
               git commit -m "feat: terraform destroy K3s cluster $(params.cluster-name)"
               git push origin main
-

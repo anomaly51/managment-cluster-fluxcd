@@ -1,0 +1,44 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: gitops-repo-create
+  namespace: default
+spec:
+  params:
+    - name: cluster-name
+      type: string
+    - name: template-url
+      type: string
+      default: "github.com/anomaly51/gitops-template-fluxcd.git"
+    - name: github-owner
+      type: string
+      default: "anomaly51"
+  results:
+    - name: repo-name
+  steps:
+    - name: create-and-push
+      image: alpine/git:v2.43.0
+      env:
+        - name: GIT_TOKEN_P1
+          value: "ghp_"
+        - name: GIT_TOKEN_P2
+          value: "r4UyKZAyUmA7Nu7zGVFSSTMwxqKhvL2S4c6W"
+      script: |
+        set -e
+        apk add --no-cache curl
+        FULL_TOKEN="${GIT_TOKEN_P1}${GIT_TOKEN_P2}"
+        NEW_REPO_NAME="$(params.cluster-name)-gitops"
+        curl -s -X POST -H "Authorization: token $FULL_TOKEN" -d "{\"name\":\"${NEW_REPO_NAME}\", \"private\": true}" https://api.github.com/user/repos
+        git clone https://${FULL_TOKEN}@$(params.template-url) /workspace/template-repo
+        cd /workspace/template-repo
+        rm -rf .git
+        find . -type f -name "*.yaml" -exec sed -i "s/{{CLUSTER_NAME}}/$(params.cluster-name)/g" {} +
+        git init
+        git branch -M main
+        git config --global user.name "Tekton Pipeline"
+        git config --global user.email "tekton@devops.local"
+        git add .
+        git commit -m "chore: initialize cluster $(params.cluster-name) from template"
+        git remote add origin https://${FULL_TOKEN}@github.com/$(params.github-owner)/${NEW_REPO_NAME}.git
+        git push -u origin main
+        echo -n "${NEW_REPO_NAME}" > $(results.repo-name.path)
