@@ -6,6 +6,6 @@ resources:
   - tasks/fluxcd-bootstrap.yaml
   - pipelines/provision-cluster-with-new-fluxcd-repo.yaml
   - pipelines/provision-cluster-with-existing-fluxcd-repo.yaml
-  - cluster-destroy.yaml
+  - pipelines/cluster-destroy.yaml
   - pipelines/vm-provision.yaml
   - pipelines/vm-destroy.yaml
