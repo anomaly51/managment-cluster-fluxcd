@@ -1,0 +1,86 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: cluster-destroy-pipeline
+  namespace: default
+spec:
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: tf-repo-url
+        value: "github.com/anomaly51/proxmox-vms-terraform.git"
+      - name: cluster-name
+        value: "new-k3s"
+  volumeClaimTemplates:
+    - metadata:
+        name: workspace
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi
+  templates:
+    - name: main
+      steps:
+        - - name: clone
+            template: clone
+        - - name: destroy
+            template: destroy
+        - - name: commit
+            template: commit
+
+    - name: clone
+      script:
+        image: alpine/git:v2.43.0
+        command: [sh]
+        env:
+          - name: GIT_TOKEN_P1
+            value: "ghp_"
+          - name: GIT_TOKEN_P2
+            value: "r4UyKZAyUmA7Nu7zGVFSSTMwxqKhvL2S4c6W"
+        source: |
+          set -e
+          git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@{{workflow.parameters.tf-repo-url}} /workspace/repo
+      volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+
+    - name: destroy
+      script:
+        image: hashicorp/terraform:1.5.7
+        command: [sh]
+        env:
+          - name: GIT_TOKEN_P1
+            value: "ghp_"
+          - name: GIT_TOKEN_P2
+            value: "r4UyKZAyUmA7Nu7zGVFSSTMwxqKhvL2S4c6W"
+        source: |
+          set -e
+          git config --global url."https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@github.com/".insteadOf "https://github.com/"
+          cd /workspace/repo/envs/shared/{{workflow.parameters.cluster-name}}
+          terraform init
+          terraform destroy -auto-approve
+      volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+
+    - name: commit
+      script:
+        image: alpine/git:v2.43.0
+        command: [sh]
+        env:
+          - name: GIT_TOKEN_P1
+            value: "ghp_"
+          - name: GIT_TOKEN_P2
+            value: "r4UyKZAyUmA7Nu7zGVFSSTMwxqKhvL2S4c6W"
+        source: |
+          set -e
+          cd /workspace/repo
+          git config --global user.name "Argo Workflow"
+          git config --global user.email "argo@devops.local"
+          git rm -rf envs/shared/{{workflow.parameters.cluster-name}}/
+          git commit -m "feat: terraform destroy K3s cluster {{workflow.parameters.cluster-name}}"
+          git push origin main
+      volumeMounts:
+        - name: workspace
+          mountPath: /workspace

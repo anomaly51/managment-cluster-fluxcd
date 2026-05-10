@@ -1,0 +1,427 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: devops-tasks
+  namespace: default
+spec:
+  templates:
+    - name: infra-provision
+      inputs:
+        parameters:
+          - name: tf-repo-url
+          - name: ansible-repo-url
+          - name: cluster-name
+          - name: target-nodes
+          - name: template-name
+          - name: master-count
+          - name: worker-count
+          - name: cores
+          - name: memory
+          - name: disk-size
+      outputs:
+        parameters:
+          - name: master-node-ip
+            valueFrom:
+              path: /workspace/master-node-ip.txt
+      steps:
+        - - name: clone-tf
+            template: infra-clone-tf
+            arguments:
+              parameters:
+                - name: tf-repo-url
+                  value: "{{inputs.parameters.tf-repo-url}}"
+        - - name: generate-tf
+            template: infra-generate-tf
+            arguments:
+              parameters:
+                - name: cluster-name
+                  value: "{{inputs.parameters.cluster-name}}"
+                - name: target-nodes
+                  value: "{{inputs.parameters.target-nodes}}"
+                - name: template-name
+                  value: "{{inputs.parameters.template-name}}"
+                - name: master-count
+                  value: "{{inputs.parameters.master-count}}"
+                - name: worker-count
+                  value: "{{inputs.parameters.worker-count}}"
+                - name: cores
+                  value: "{{inputs.parameters.cores}}"
+                - name: memory
+                  value: "{{inputs.parameters.memory}}"
+                - name: disk-size
+                  value: "{{inputs.parameters.disk-size}}"
+        - - name: apply-tf
+            template: infra-apply-tf
+            arguments:
+              parameters:
+                - name: cluster-name
+                  value: "{{inputs.parameters.cluster-name}}"
+        - - name: run-ansible
+            template: infra-run-ansible
+            arguments:
+              parameters:
+                - name: ansible-repo-url
+                  value: "{{inputs.parameters.ansible-repo-url}}"
+                - name: cluster-name
+                  value: "{{inputs.parameters.cluster-name}}"
+
+    - name: infra-clone-tf
+      inputs:
+        parameters:
+          - name: tf-repo-url
+      script:
+        image: alpine/git:v2.43.0
+        command: [sh]
+        env:
+          - name: GIT_TOKEN_P1
+            value: "ghp_"
+          - name: GIT_TOKEN_P2
+            value: "r4UyKZAyUmA7Nu7zGVFSSTMwxqKhvL2S4c6W"
+        source: |
+          set -e
+          rm -rf /workspace/tf-repo
+          git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@{{inputs.parameters.tf-repo-url}} /workspace/tf-repo
+      volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+
+    - name: infra-generate-tf
+      inputs:
+        parameters:
+          - name: cluster-name
+          - name: target-nodes
+          - name: template-name
+          - name: master-count
+          - name: worker-count
+          - name: cores
+          - name: memory
+          - name: disk-size
+      script:
+        image: alpine:3.18
+        command: [sh]
+        source: |
+          set -e
+          mkdir -p /workspace/tf-repo/envs/shared/{{inputs.parameters.cluster-name}}
+          cat << 'EOF' > /workspace/tf-repo/envs/shared/{{inputs.parameters.cluster-name}}/main.tf
+          terraform {
+            required_providers {
+              proxmox = {
+                source  = "telmate/proxmox"
+                version = "3.0.2-rc07"
+              }
+            }
+          }
+          provider "proxmox" {
+            pm_api_url          = "https://192.168.1.35:8006/api2/json"
+            pm_api_token_id     = "terraform@pam!terraform"
+            pm_api_token_secret = "bdcbd933-8cbf-4c6c-be85-41b0b8f74ba3"
+            pm_tls_insecure     = true
+            pm_parallel         = 4
+          }
+          module "k3s_cluster" {
+            source        = "../../../modules/k3s-cluster"
+            cluster_name  = "{{inputs.parameters.cluster-name}}"
+            proxmox_nodes = {{inputs.parameters.target-nodes}}
+            template_name = "{{inputs.parameters.template-name}}"
+            master_count  = {{inputs.parameters.master-count}}
+            worker_count  = {{inputs.parameters.worker-count}}
+            cores         = {{inputs.parameters.cores}}
+            memory        = {{inputs.parameters.memory}}
+            disk_size     = {{inputs.parameters.disk-size}}
+          }
+          EOF
+      volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+
+    - name: infra-apply-tf
+      inputs:
+        parameters:
+          - name: cluster-name
+      script:
+        image: hashicorp/terraform:1.5.7
+        command: [sh]
+        env:
+          - name: GIT_TOKEN_P1
+            value: "ghp_"
+          - name: GIT_TOKEN_P2
+            value: "r4UyKZAyUmA7Nu7zGVFSSTMwxqKhvL2S4c6W"
+        source: |
+          set -e
+          git config --global url."https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@github.com/".insteadOf "https://github.com/"
+          cd /workspace/tf-repo/envs/shared/{{inputs.parameters.cluster-name}}
+          terraform init
+          terraform apply -auto-approve
+      volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+
+    - name: infra-run-ansible
+      inputs:
+        parameters:
+          - name: ansible-repo-url
+          - name: cluster-name
+      script:
+        image: alpine:3.18
+        command: [sh]
+        env:
+          - name: GIT_TOKEN_P1
+            value: "ghp_"
+          - name: GIT_TOKEN_P2
+            value: "r4UyKZAyUmA7Nu7zGVFSSTMwxqKhvL2S4c6W"
+          - name: ANSIBLE_HOST_KEY_CHECKING
+            value: "False"
+        source: |
+          set -e
+          apk add --no-cache git ansible openssh-client py3-pip py3-requests jq
+          pip3 install proxmoxer --break-system-packages || pip3 install proxmoxer
+          ansible-galaxy collection install community.proxmox
+          mkdir -p ~/.ssh
+          cat << 'EOF' > ~/.ssh/id_ed25519_proxmox-vm
+          -----BEGIN OPENSSH PRIVATE KEY-----
+          b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+          QyNTUxOQAAACD5YK+hwQw+eyIBAEdg/nTJ4/Lv9iLdbqPTpKoH2lUIpwAAAJAa/POCGvzz
+          ggAAAAtzc2gtZWQyNTUxOQAAACD5YK+hwQw+eyIBAEdg/nTJ4/Lv9iLdbqPTpKoH2lUIpw
+          AAAEDIuAdzJk3z34U/O5FvZ4zh2JdiBcj2elF6RNyI0uFG6flgr6HBDD57IgEAR2D+dMnj
+          8u/2It1uo9OkqgfaVQinAAAACnByb3htb3gtdm0BAgM=
+          -----END OPENSSH PRIVATE KEY-----
+          EOF
+          chmod 600 ~/.ssh/id_ed25519_proxmox-vm
+          git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@{{inputs.parameters.ansible-repo-url}} /workspace/ansible-repo
+          chmod 755 /workspace/ansible-repo
+          cd /workspace/ansible-repo
+          sleep 45
+          ansible-playbook -i inventory/proxmox.yml playbooks/setup-k3s-cluster.yaml \
+            -e "target_master=~.*{{inputs.parameters.cluster-name}}-master.*" \
+            -e "target_workers=~.*{{inputs.parameters.cluster-name}}-worker.*"
+          MASTER_IP=$(ansible-inventory -i inventory/proxmox.yml --host {{inputs.parameters.cluster-name}}-master-01 | jq -r .ansible_host)
+          echo -n "$MASTER_IP" > /workspace/master-node-ip.txt
+      volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+
+    - name: gitops-repo-create
+      inputs:
+        parameters:
+          - name: cluster-name
+          - name: template-url
+            default: "github.com/anomaly51/gitops-template-fluxcd.git"
+          - name: github-owner
+            default: "anomaly51"
+      outputs:
+        parameters:
+          - name: repo-name
+            valueFrom:
+              path: /workspace/repo-name.txt
+      script:
+        image: alpine/git:v2.43.0
+        command: [sh]
+        env:
+          - name: GIT_TOKEN_P1
+            value: "ghp_"
+          - name: GIT_TOKEN_P2
+            value: "r4UyKZAyUmA7Nu7zGVFSSTMwxqKhvL2S4c6W"
+        source: |
+          set -e
+          apk add --no-cache curl
+          FULL_TOKEN="${GIT_TOKEN_P1}${GIT_TOKEN_P2}"
+          NEW_REPO_NAME="{{inputs.parameters.cluster-name}}-gitops"
+
+          curl -s -X POST -H "Authorization: token $FULL_TOKEN" -d "{\"name\":\"${NEW_REPO_NAME}\", \"private\": true}" https://api.github.com/orgs/{{inputs.parameters.github-owner}}/repos
+
+          git clone https://${FULL_TOKEN}@{{inputs.parameters.template-url}} /workspace/template-repo
+          cd /workspace/template-repo
+          rm -rf .git
+          find . -type f -name "*.yaml" -exec sed -i "s/{{CLUSTER_NAME}}/{{inputs.parameters.cluster-name}}/g" {} +
+          git init
+          git branch -M main
+          git config --global user.name "Tekton Pipeline"
+          git config --global user.email "tekton@devops.local"
+          git add .
+          git commit -m "chore: initialize cluster {{inputs.parameters.cluster-name}} from template"
+          git remote add origin https://${FULL_TOKEN}@github.com/{{inputs.parameters.github-owner}}/${NEW_REPO_NAME}.git
+          git push -u origin main
+          echo -n "${NEW_REPO_NAME}" > /workspace/repo-name.txt
+      volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+
+    - name: fluxcd-bootstrap
+      inputs:
+        parameters:
+          - name: cluster-name
+          - name: github-owner
+          - name: repo-name
+          - name: master-node-ip
+      steps:
+        - - name: fetch-kubeconfig
+            template: fluxcd-fetch-kubeconfig
+            arguments:
+              parameters:
+                - name: cluster-name
+                  value: "{{inputs.parameters.cluster-name}}"
+                - name: master-node-ip
+                  value: "{{inputs.parameters.master-node-ip}}"
+        - - name: bootstrap
+            template: fluxcd-run-bootstrap
+            arguments:
+              parameters:
+                - name: github-owner
+                  value: "{{inputs.parameters.github-owner}}"
+                - name: repo-name
+                  value: "{{inputs.parameters.repo-name}}"
+
+    - name: fluxcd-fetch-kubeconfig
+      inputs:
+        parameters:
+          - name: master-node-ip
+          - name: cluster-name
+      script:
+        image: alpine:3.18
+        command: [sh]
+        source: |
+          set -e
+          apk add --no-cache curl openssh-client
+          curl -sLS https://get.k3sup.dev | sh
+          mkdir -p ~/.ssh
+          cat << 'EOF' > ~/.ssh/id_ed25519
+          -----BEGIN OPENSSH PRIVATE KEY-----
+          b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+          QyNTUxOQAAACD5YK+hwQw+eyIBAEdg/nTJ4/Lv9iLdbqPTpKoH2lUIpwAAAJAa/POCGvzz
+          ggAAAAtzc2gtZWQyNTUxOQAAACD5YK+hwQw+eyIBAEdg/nTJ4/Lv9iLdbqPTpKoH2lUIpw
+          AAAEDIuAdzJk3z34U/O5FvZ4zh2JdiBcj2elF6RNyI0uFG6flgr6HBDD57IgEAR2D+dMnj
+          8u/2It1uo9OkqgfaVQinAAAACnByb3htb3gtdm0BAgM=
+          -----END OPENSSH PRIVATE KEY-----
+          EOF
+          chmod 600 ~/.ssh/id_ed25519
+          k3sup install --skip-install --host {{inputs.parameters.master-node-ip}} --user root --ssh-key ~/.ssh/id_ed25519 --local-path /workspace/kubeconfig --context {{inputs.parameters.cluster-name}}
+      volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+
+    - name: fluxcd-run-bootstrap
+      inputs:
+        parameters:
+          - name: github-owner
+          - name: repo-name
+      script:
+        image: dtzar/helm-kubectl:3.12
+        command: [sh]
+        env:
+          - name: GIT_TOKEN_P1
+            value: "ghp_"
+          - name: GIT_TOKEN_P2
+            value: "r4UyKZAyUmA7Nu7zGVFSSTMwxqKhvL2S4c6W"
+        source: |
+          set -e
+          export KUBECONFIG=/workspace/kubeconfig
+          export GITHUB_TOKEN="${GIT_TOKEN_P1}${GIT_TOKEN_P2}"
+          curl -s https://fluxcd.io/install.sh | bash
+          flux bootstrap github \
+            --owner={{inputs.parameters.github-owner}} \
+            --repository={{inputs.parameters.repo-name}} \
+            --branch=main \
+            --path=./cluster \
+            --personal=true
+      volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+
+    - name: tf-commit
+      inputs:
+        parameters:
+          - name: cluster-name
+      script:
+        image: alpine/git:v2.43.0
+        command: [sh]
+        env:
+          - name: GIT_TOKEN_P1
+            value: "ghp_"
+          - name: GIT_TOKEN_P2
+            value: "r4UyKZAyUmA7Nu7zGVFSSTMwxqKhvL2S4c6W"
+        source: |
+          set -e
+          cd /workspace/tf-repo
+          git config --global user.name "Tekton Pipeline"
+          git config --global user.email "tekton@devops.local"
+          git add envs/shared/{{inputs.parameters.cluster-name}}/
+          git commit -m "feat: terraform apply and ansible init K3s cluster {{inputs.parameters.cluster-name}}"
+          git push origin main
+      volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+
+    - name: cleanup-on-failure
+      inputs:
+        parameters:
+          - name: cluster-name
+          - name: github-owner
+          - name: repo-name
+          - name: delete-repo
+            default: "true"
+      steps:
+        - - name: terraform-destroy
+            template: cleanup-terraform-destroy
+            arguments:
+              parameters:
+                - name: cluster-name
+                  value: "{{inputs.parameters.cluster-name}}"
+        - - name: delete-gitops-repo
+            template: cleanup-delete-gitops-repo
+            arguments:
+              parameters:
+                - name: github-owner
+                  value: "{{inputs.parameters.github-owner}}"
+                - name: repo-name
+                  value: "{{inputs.parameters.repo-name}}"
+                - name: delete-repo
+                  value: "{{inputs.parameters.delete-repo}}"
+
+    - name: cleanup-terraform-destroy
+      inputs:
+        parameters:
+          - name: cluster-name
+      script:
+        image: hashicorp/terraform:1.5.7
+        command: [sh]
+        env:
+          - name: GIT_TOKEN_P1
+            value: "ghp_"
+          - name: GIT_TOKEN_P2
+            value: "r4UyKZAyUmA7Nu7zGVFSSTMwxqKhvL2S4c6W"
+        source: |
+          CLUSTER_DIR="/workspace/tf-repo/envs/shared/{{inputs.parameters.cluster-name}}"
+          if [ -d "$CLUSTER_DIR" ] && [ -f "$CLUSTER_DIR/terraform.tfstate" ]; then
+            git config --global url."https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@github.com/".insteadOf "https://github.com/"
+            cd $CLUSTER_DIR
+            terraform init
+            terraform destroy -auto-approve
+          fi
+      volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+
+    - name: cleanup-delete-gitops-repo
+      inputs:
+        parameters:
+          - name: github-owner
+          - name: repo-name
+          - name: delete-repo
+      script:
+        image: alpine:3.18
+        command: [sh]
+        env:
+          - name: GIT_TOKEN_P1
+            value: "ghp_"
+          - name: GIT_TOKEN_P2
+            value: "r4UyKZAyUmA7Nu7zGVFSSTMwxqKhvL2S4c6W"
+        source: |
+          set -e
+          if [ "{{inputs.parameters.delete-repo}}" == "true" ]; then
+            apk add --no-cache curl
+            FULL_TOKEN="${GIT_TOKEN_P1}${GIT_TOKEN_P2}"
+            curl -s -o /dev/null -w "%{http_code}" -X DELETE -H "Authorization: token $FULL_TOKEN" https://api.github.com/repos/{{inputs.parameters.github-owner}}/{{inputs.parameters.repo-name}}
+          fi
+      volumeMounts:
+        - name: workspace
+          mountPath: /workspace

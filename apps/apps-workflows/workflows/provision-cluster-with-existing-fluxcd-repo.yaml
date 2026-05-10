@@ -1,0 +1,114 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: provision-cluster-with-existing-fluxcd-repo
+  namespace: default
+spec:
+  entrypoint: main
+  onExit: cleanup
+  arguments:
+    parameters:
+      - name: tf-repo-url
+        value: "github.com/anomaly51/proxmox-vms-terraform.git"
+      - name: ansible-repo-url
+        value: "github.com/anomaly51/ansible-infra.git"
+      - name: cluster-name
+        value: "new-k3s"
+      - name: target-nodes
+        value: '["machine-1", "machine-2"]'
+      - name: template-name
+        value: "debian-k3s"
+      - name: master-count
+        value: "1"
+      - name: worker-count
+        value: "2"
+      - name: cores
+        value: "4"
+      - name: memory
+        value: "4096"
+      - name: disk-size
+        value: "20"
+      - name: github-owner
+        value: "anomaly51"
+      - name: repo-name
+        value: "existing-repo"
+  volumeClaimTemplates:
+    - metadata:
+        name: workspace
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: provision-infra
+            templateRef:
+              name: devops-tasks
+              template: infra-provision
+            arguments:
+              parameters:
+                - name: tf-repo-url
+                  value: "{{workflow.parameters.tf-repo-url}}"
+                - name: ansible-repo-url
+                  value: "{{workflow.parameters.ansible-repo-url}}"
+                - name: cluster-name
+                  value: "{{workflow.parameters.cluster-name}}"
+                - name: target-nodes
+                  value: "{{workflow.parameters.target-nodes}}"
+                - name: template-name
+                  value: "{{workflow.parameters.template-name}}"
+                - name: master-count
+                  value: "{{workflow.parameters.master-count}}"
+                - name: worker-count
+                  value: "{{workflow.parameters.worker-count}}"
+                - name: cores
+                  value: "{{workflow.parameters.cores}}"
+                - name: memory
+                  value: "{{workflow.parameters.memory}}"
+                - name: disk-size
+                  value: "{{workflow.parameters.disk-size}}"
+          - name: bootstrap-fluxcd
+            dependencies: [provision-infra]
+            templateRef:
+              name: devops-tasks
+              template: fluxcd-bootstrap
+            arguments:
+              parameters:
+                - name: cluster-name
+                  value: "{{workflow.parameters.cluster-name}}"
+                - name: github-owner
+                  value: "{{workflow.parameters.github-owner}}"
+                - name: repo-name
+                  value: "{{workflow.parameters.repo-name}}"
+                - name: master-node-ip
+                  value: "{{tasks.provision-infra.outputs.parameters.master-node-ip}}"
+          - name: commit-tf-state
+            dependencies: [bootstrap-fluxcd]
+            templateRef:
+              name: devops-tasks
+              template: tf-commit
+            arguments:
+              parameters:
+                - name: cluster-name
+                  value: "{{workflow.parameters.cluster-name}}"
+
+    - name: cleanup
+      steps:
+        - - name: run-cleanup
+            templateRef:
+              name: devops-tasks
+              template: cleanup-on-failure
+            when: "{{workflow.status}} == Failed"
+            arguments:
+              parameters:
+                - name: cluster-name
+                  value: "{{workflow.parameters.cluster-name}}"
+                - name: github-owner
+                  value: "{{workflow.parameters.github-owner}}"
+                - name: repo-name
+                  value: "{{workflow.parameters.repo-name}}"
+                - name: delete-repo
+                  value: "false"
