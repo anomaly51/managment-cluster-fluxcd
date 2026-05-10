@@ -11,6 +11,8 @@ spec:
       type: string
     - name: repo-name
       type: string
+    - name: master-node-ip
+      type: string
   steps:
     - name: fetch-kubeconfig
       image: alpine:3.18
@@ -29,8 +31,7 @@ spec:
         -----END OPENSSH PRIVATE KEY-----
         EOF
         chmod 600 ~/.ssh/id_ed25519
-        MASTER_NODE="$(params.cluster-name)-master-01"
-        k3sup install --skip-install --host ${MASTER_NODE} --user root --ssh-key ~/.ssh/id_ed25519 --local-path /workspace/kubeconfig --context $(params.cluster-name)
+        k3sup install --skip-install --host $(params.master-node-ip) --user root --ssh-key ~/.ssh/id_ed25519 --local-path /workspace/kubeconfig --context $(params.cluster-name)
     - name: bootstrap
       image: dtzar/helm-kubectl:3.12
       env:

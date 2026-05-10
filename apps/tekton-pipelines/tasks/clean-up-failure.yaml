@@ -1,0 +1,61 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: cleanup-on-failure
+  namespace: default
+spec:
+  params:
+    - name: cluster-name
+      type: string
+    - name: github-owner
+      type: string
+    - name: repo-name
+      type: string
+    - name: delete-repo
+      type: string
+      default: "true"
+  workspaces:
+    - name: shared-data
+  steps:
+    - name: terraform-destroy
+      image: hashicorp/terraform:1.5.7
+      env:
+        - name: GIT_TOKEN_P1
+          value: "ghp_"
+        - name: GIT_TOKEN_P2
+          value: "r4UyKZAyUmA7Nu7zGVFSSTMwxqKhvL2S4c6W"
+      script: |
+        CLUSTER_DIR="$(workspaces.shared-data.path)/tf-repo/envs/shared/$(params.cluster-name)"
+        if [ -d "$CLUSTER_DIR" ] && [ -f "$CLUSTER_DIR/terraform.tfstate" ]; then
+          echo "Terraform state found. Rolling back (destroying) infrastructure..."
+          git config --global url."https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@github.com/".insteadOf "https://github.com/"
+          cd $CLUSTER_DIR
+          terraform init
+          terraform destroy -auto-approve
+        else
+          echo "No terraform.tfstate found. Skipping infrastructure rollback."
+        fi
+
+    - name: delete-gitops-repo
+      image: alpine:3.18
+      env:
+        - name: GIT_TOKEN_P1
+          value: "ghp_"
+        - name: GIT_TOKEN_P2
+          value: "r4UyKZAyUmA7Nu7zGVFSSTMwxqKhvL2S4c6W"
+      script: |
+        set -e
+        if [ "$(params.delete-repo)" == "true" ]; then
+          apk add --no-cache curl
+          FULL_TOKEN="${GIT_TOKEN_P1}${GIT_TOKEN_P2}"
+          echo "Attempting to delete GitHub repo: $(params.github-owner)/$(params.repo-name)..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE -H "Authorization: token $FULL_TOKEN" https://api.github.com/repos/$(params.github-owner)/$(params.repo-name))
+          
+          if [ "$HTTP_STATUS" -eq 204 ]; then
+            echo "Repository deleted successfully."
+          else
+            echo "Repository not found or already deleted (HTTP $HTTP_STATUS)."
+          fi
+        else
+          echo "delete-repo is set to false. Skipping repository deletion."
+        fi

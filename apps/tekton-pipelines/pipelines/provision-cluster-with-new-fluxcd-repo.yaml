@@ -4,6 +4,8 @@ metadata:
   name: provision-cluster-with-new-fluxcd-repo
   namespace: default
 spec:
+  workspaces:
+    - name: shared-data
   params:
     - name: tf-repo-url
       type: string
@@ -42,6 +44,9 @@ spec:
     - name: provision-infra
       taskRef:
         name: infra-provision
+      workspaces:
+        - name: shared-data
+          workspace: shared-data
       params:
         - name: tf-repo-url
           value: $(params.tf-repo-url)
@@ -63,6 +68,7 @@ spec:
           value: $(params.memory)
         - name: disk-size
           value: $(params.disk-size)
+
     - name: create-gitops-repo
       taskRef:
         name: gitops-repo-create
@@ -71,6 +77,7 @@ spec:
           value: $(params.cluster-name)
         - name: github-owner
           value: $(params.github-owner)
+
     - name: bootstrap-fluxcd
       taskRef:
         name: fluxcd-bootstrap
@@ -84,3 +91,39 @@ spec:
           value: $(params.github-owner)
         - name: repo-name
           value: $(tasks.create-gitops-repo.results.repo-name)
+        - name: master-node-ip
+          value: $(tasks.provision-infra.results.master-node-ip)
+
+    - name: commit-tf-state
+      taskRef:
+        name: tf-commit
+      runAfter:
+        - bootstrap-fluxcd
+      workspaces:
+        - name: shared-data
+          workspace: shared-data
+      params:
+        - name: cluster-name
+          value: $(params.cluster-name)
+
+  # Блок finally выполнится в любом случае по завершению pipeline
+  finally:
+    - name: cleanup-on-failure
+      # Но запустим мы cleanup ТОЛЬКО если пайплайн упал
+      when:
+        - input: "$(tasks.status)"
+          operator: in
+          values: ["Failed"]
+      taskRef:
+        name: cleanup-on-failure
+      workspaces:
+        - name: shared-data
+          workspace: shared-data
+      params:
+        - name: cluster-name
+          value: $(params.cluster-name)
+        - name: github-owner
+          value: $(params.github-owner)
+        - name: repo-name
+          value: "$(params.cluster-name)-gitops"
+

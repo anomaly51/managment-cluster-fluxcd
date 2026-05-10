@@ -4,6 +4,8 @@ resources:
   - tasks/infra-provision.yaml
   - tasks/gitops-repo-create.yaml
   - tasks/fluxcd-bootstrap.yaml
+  - tasks/tf-commit.yaml # ДОБАВЛЕНО
+  - tasks/cleanup-on-failure.yaml # ДОБАВЛЕНО
   - pipelines/provision-cluster-with-new-fluxcd-repo.yaml
   - pipelines/provision-cluster-with-existing-fluxcd-repo.yaml
   - pipelines/cluster-destroy.yaml
