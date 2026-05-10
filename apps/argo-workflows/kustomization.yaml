@@ -8,9 +8,12 @@ resources:
   - https://github.com/argoproj/argo-workflows/releases/download/v3.5.5/install.yaml
   - workflows/vm-provision-template.yaml
   - workflows/vm-destroy-template.yaml
+  - workflows/cluster-provision-template.yaml
+  - workflows/cluster-destroy-template.yaml
 
 patches:
   - path: base/argo-server-patch.yaml
     target:
       kind: Deployment
       name: argo-server
+
