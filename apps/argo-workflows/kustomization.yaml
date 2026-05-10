@@ -10,3 +10,9 @@ resources:
   - workflows/provision-cluster-with-new-fluxcd-repo.yaml
   - workflows/vm-destroy.yaml
   - workflows/vm-provision.yaml
+
+patches:
+  - path: argo-server-patch.yaml
+    target:
+      kind: Deployment
+      name: argo-server
