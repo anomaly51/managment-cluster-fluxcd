@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
   name: vm-provision-pipeline
-  namespace: default
+  namespace: argo-workflows
 spec:
   entrypoint: main
   arguments:
@@ -33,103 +33,47 @@ spec:
     - name: main
       steps:
         - - name: clone
-            template: clone
+            templateRef: { name: git-tasks, template: clone-repo }
+            arguments:
+              parameters:
+                [
+                  { name: repo-url, value: "{{workflow.parameters.repo-url}}" },
+                  { name: dest-path, value: "/workspace/repo" },
+                ]
         - - name: generate
-            template: generate
+            templateRef: { name: tf-tasks, template: generate-tf-vm }
+            arguments:
+              parameters:
+                - name: vm-name
+                  value: "{{workflow.parameters.vm-name}}"
+                - name: target-node
+                  value: "{{workflow.parameters.target-node}}"
+                - name: template-name
+                  value: "{{workflow.parameters.template-name}}"
+                - name: cores
+                  value: "{{workflow.parameters.cores}}"
+                - name: memory
+                  value: "{{workflow.parameters.memory}}"
+                - name: disk-size
+                  value: "{{workflow.parameters.disk-size}}"
         - - name: apply
-            template: apply
+            templateRef: { name: tf-tasks, template: apply-tf }
+            arguments:
+              parameters:
+                [
+                  {
+                    name: tf-dir,
+                    value: "/workspace/repo/envs/shared/{{workflow.parameters.vm-name}}",
+                  },
+                ]
         - - name: commit
-            template: commit
+            templateRef: { name: git-tasks, template: commit-changes }
+            arguments:
+              parameters:
+                - name: repo-path
+                  value: "/workspace/repo"
+                - name: add-path
+                  value: "envs/shared/{{workflow.parameters.vm-name}}/"
+                - name: commit-message
+                  value: "feat: terraform apply VM {{workflow.parameters.vm-name}}"
 
-    - name: clone
-      script:
-        image: alpine/git:v2.43.0
-        command: [sh]
-        env:
-          - name: GIT_TOKEN_P1
-            value: "ghp_"
-          - name: GIT_TOKEN_P2
-            value: "r4UyKZAyUmA7Nu7zGVFSSTMwxqKhvL2S4c6W"
-        source: |
-          set -e
-          git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@{{workflow.parameters.repo-url}} /workspace/repo
-      volumeMounts:
-        - name: workspace
-          mountPath: /workspace
-
-    - name: generate
-      script:
-        image: alpine:3.18
-        command: [sh]
-        source: |
-          set -e
-          mkdir -p /workspace/repo/envs/shared/{{workflow.parameters.vm-name}}
-          cat << 'EOF' > /workspace/repo/envs/shared/{{workflow.parameters.vm-name}}/main.tf
-          terraform {
-            required_providers {
-              proxmox = {
-                source  = "telmate/proxmox"
-                version = "3.0.2-rc07"
-              }
-            }
-          }
-          provider "proxmox" {
-            pm_api_url          = "https://192.168.1.35:8006/api2/json"
-            pm_api_token_id     = "terraform@pam!terraform"
-            pm_api_token_secret = "bdcbd933-8cbf-4c6c-be85-41b0b8f74ba3"
-            pm_tls_insecure     = true
-          }
-          module "vm" {
-            source          = "../../../modules/vm"
-            name            = "{{workflow.parameters.vm-name}}"
-            description     = "Provisioned via Argo Workflow (Terraform Apply)"
-            template_name   = "{{workflow.parameters.template-name}}"
-            target_node     = "{{workflow.parameters.target-node}}"
-            cores           = {{workflow.parameters.cores}}
-            memory          = {{workflow.parameters.memory}}
-            scsi0_disk_size = {{workflow.parameters.disk-size}}
-          }
-          EOF
-      volumeMounts:
-        - name: workspace
-          mountPath: /workspace
-
-    - name: apply
-      script:
-        image: hashicorp/terraform:1.5.7
-        command: [sh]
-        env:
-          - name: GIT_TOKEN_P1
-            value: "ghp_"
-          - name: GIT_TOKEN_P2
-            value: "r4UyKZAyUmA7Nu7zGVFSSTMwxqKhvL2S4c6W"
-        source: |
-          set -e
-          git config --global url."https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@github.com/".insteadOf "https://github.com/"
-          cd /workspace/repo/envs/shared/{{workflow.parameters.vm-name}}
-          terraform init
-          terraform apply -auto-approve
-      volumeMounts:
-        - name: workspace
-          mountPath: /workspace
-
-    - name: commit
-      script:
-        image: alpine/git:v2.43.0
-        command: [sh]
-        env:
-          - name: GIT_TOKEN_P1
-            value: "ghp_"
-          - name: GIT_TOKEN_P2
-            value: "r4UyKZAyUmA7Nu7zGVFSSTMwxqKhvL2S4c6W"
-        source: |
-          set -e
-          cd /workspace/repo
-          git config --global user.name "Argo Workflow"
-          git config --global user.email "argo@devops.local"
-          git add envs/shared/{{workflow.parameters.vm-name}}/
-          git commit -m "feat: terraform apply VM {{workflow.parameters.vm-name}}"
-          git push origin main
-      volumeMounts:
-        - name: workspace
-          mountPath: /workspace
