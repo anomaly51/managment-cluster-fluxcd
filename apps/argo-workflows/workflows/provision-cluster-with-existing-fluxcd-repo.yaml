@@ -127,16 +127,18 @@ spec:
                   value: "feat: terraform apply K3s cluster {{workflow.parameters.cluster-name}}"
 
     - name: cleanup
-      templateRef: { name: cleanup-tasks, template: cleanup-on-failure }
-      when: "{{workflow.status}} == Failed"
-      arguments:
-        parameters:
-          - name: cluster-name
-            value: "{{workflow.parameters.cluster-name}}"
-          - name: github-owner
-            value: "{{workflow.parameters.github-owner}}"
-          - name: repo-name
-            value: "{{workflow.parameters.repo-name}}"
-          - name: delete-repo
-            value: "false"
+      steps:
+        - - name: execute-cleanup
+            templateRef:
+              name: cleanup-tasks
+              template: cleanup-on-failure
+            when: "{{workflow.status}} == Failed"
+            arguments:
+              parameters:
+                - name: cluster-name
+                  value: "{{workflow.parameters.cluster-name}}"
+                - name: github-owner
+                  value: "{{workflow.parameters.github-owner}}"
+                - name: repo-name
+                  value: "{{workflow.parameters.cluster-name}}-gitops"
 
