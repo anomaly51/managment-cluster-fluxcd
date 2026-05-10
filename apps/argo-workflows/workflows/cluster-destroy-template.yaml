@@ -8,15 +8,12 @@ spec:
   entrypoint: destroy-steps
   arguments:
     parameters:
-      - name: tf-repo-url
-        value: "github.com/anomaly51/proxmox-vms-terraform.git"
       - name: cluster-name
         value: "new-k3s"
   templates:
     - name: destroy-steps
       inputs:
         parameters:
-          - name: tf-repo-url
           - name: cluster-name
       volumes:
         - name: workspace
@@ -37,7 +34,7 @@ spec:
             args:
               - |
                 set -e
-                git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@{{inputs.parameters.tf-repo-url}} /workspace/repo
+                git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@github.com/anomaly51/proxmox-vms-terraform.git /workspace/repo
 
           - name: destroy-tf
             dependencies: [clone-tf]
@@ -93,3 +90,4 @@ spec:
                 git rm -rf envs/shared/{{inputs.parameters.cluster-name}}/
                 git commit -m "feat: terraform destroy K3s cluster {{inputs.parameters.cluster-name}}"
                 git push origin main
+

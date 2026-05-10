@@ -8,16 +8,10 @@ spec:
   entrypoint: provision-steps
   arguments:
     parameters:
-      - name: tf-repo-url
-        value: "github.com/anomaly51/proxmox-vms-terraform.git"
-      - name: ansible-repo-url
-        value: "github.com/anomaly51/ansible-infra.git"
       - name: cluster-name
         value: "new-k3s"
       - name: target-nodes
         value: '["machine-1", "machine-2"]'
-      - name: template-name
-        value: "debian-k3s"
       - name: master-count
         value: "1"
       - name: worker-count
@@ -32,11 +26,8 @@ spec:
     - name: provision-steps
       inputs:
         parameters:
-          - name: tf-repo-url
-          - name: ansible-repo-url
           - name: cluster-name
           - name: target-nodes
-          - name: template-name
           - name: master-count
           - name: worker-count
           - name: cores
@@ -61,7 +52,7 @@ spec:
             args:
               - |
                 set -e
-                git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@{{inputs.parameters.tf-repo-url}} /workspace/tf-repo
+                git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@github.com/anomaly51/proxmox-vms-terraform.git /workspace/tf-repo
 
           - name: generate-tf
             dependencies: [clone-tf]
@@ -94,7 +85,7 @@ spec:
                   source        = "../../../modules/k3s-cluster"
                   cluster_name  = "{{inputs.parameters.cluster-name}}"
                   proxmox_nodes = {{inputs.parameters.target-nodes}}
-                  template_name = "{{inputs.parameters.template-name}}"
+                  template_name = "debian-k3s"
                   master_count  = {{inputs.parameters.master-count}}
                   worker_count  = {{inputs.parameters.worker-count}}
                   cores         = {{inputs.parameters.cores}}
@@ -150,7 +141,7 @@ spec:
                 EOF
                 chmod 600 ~/.ssh/id_ed25519_proxmox-vm
 
-                git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@{{inputs.parameters.ansible-repo-url}} /workspace/ansible-repo
+                git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@github.com/anomaly51/ansible-infra.git /workspace/ansible-repo
                 chmod 755 /workspace/ansible-repo
                 cd /workspace/ansible-repo
                 sleep 45
@@ -182,9 +173,8 @@ spec:
                 {
                   "owner": "anomaly51",
                   "name": "{{inputs.parameters.cluster-name}}-fluxcd",
-                  "description": "GitOps repository for {{inputs.parameters.cluster-name}}",
                   "include_all_branches": false,
-                  "private": true
+                  "private": false
                 }
                 EOF
 
@@ -207,6 +197,7 @@ spec:
                   --branch=main \
                   --path=cluster \
                   --personal=true \
+                  --private=false \
                   --token-auth
 
           - name: commit-tf

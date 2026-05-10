@@ -8,15 +8,12 @@ spec:
   entrypoint: destroy-steps
   arguments:
     parameters:
-      - name: repo-url
-        value: "github.com/anomaly51/proxmox-vms-terraform.git"
       - name: vm-name
         value: "new-vm"
   templates:
     - name: destroy-steps
       inputs:
         parameters:
-          - name: repo-url
           - name: vm-name
       volumes:
         - name: workspace
@@ -37,7 +34,7 @@ spec:
             args:
               - |
                 set -e
-                git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@{{inputs.parameters.repo-url}} /workspace/repo
+                git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@github.com/anomaly51/proxmox-vms-terraform.git /workspace/repo
           - name: destroy
             dependencies: [clone]
             image: hashicorp/terraform:1.5.7
@@ -72,3 +69,4 @@ spec:
                 git rm -rf envs/shared/{{inputs.parameters.vm-name}}/
                 git commit -m "feat: terraform destroy VM {{inputs.parameters.vm-name}} and remove state"
                 git push origin main
+

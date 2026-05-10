@@ -8,8 +8,6 @@ spec:
   entrypoint: provision-steps
   arguments:
     parameters:
-      - name: repo-url
-        value: "github.com/anomaly51/proxmox-vms-terraform.git"
       - name: vm-name
         value: "new-vm"
       - name: target-node
@@ -20,19 +18,15 @@ spec:
         value: "4096"
       - name: disk-size
         value: "20"
-      - name: template-name
-        value: "debian-base"
   templates:
     - name: provision-steps
       inputs:
         parameters:
-          - name: repo-url
           - name: vm-name
           - name: target-node
           - name: cores
           - name: memory
           - name: disk-size
-          - name: template-name
       volumes:
         - name: workspace
           emptyDir: {}
@@ -52,7 +46,7 @@ spec:
             args:
               - |
                 set -e
-                git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@{{inputs.parameters.repo-url}} /workspace/repo
+                git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@github.com/anomaly51/proxmox-vms-terraform.git /workspace/repo
           - name: generate
             dependencies: [clone]
             image: alpine:3.18
@@ -80,7 +74,7 @@ spec:
                   source          = "../../../modules/vm"
                   name            = "{{inputs.parameters.vm-name}}"
                   description     = "Provisioned via Argo Workflows (Terraform Apply)"
-                  template_name   = "{{inputs.parameters.template-name}}"
+                  template_name   = "debian-base"
                   target_node     = "{{inputs.parameters.target-node}}"
                   cores           = {{inputs.parameters.cores}}
                   memory          = {{inputs.parameters.memory}}
@@ -121,3 +115,4 @@ spec:
                 git add envs/shared/{{inputs.parameters.vm-name}}/
                 git commit -m "feat: terraform apply VM {{inputs.parameters.vm-name}}"
                 git push origin main
+
