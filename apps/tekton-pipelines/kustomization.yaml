@@ -11,4 +11,3 @@ resources:
   - pipelines/cluster-destroy.yaml
   - pipelines/vm-provision.yaml
   - pipelines/vm-destroy.yaml
-  - tekton-config.yaml

@@ -3,3 +3,23 @@ kind: Kustomization
 resources:
   - https://storage.googleapis.com/tekton-releases/pipeline/latest/release.yaml
   - https://infra.tekton.dev/tekton-releases/dashboard/latest/release-full.yaml
+patches:
+  - target:
+      kind: ConfigMap
+      name: config-defaults
+      namespace: tekton-pipelines
+    patch: |-
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: config-defaults
+        namespace: tekton-pipelines
+      data:
+        defaultPipelineRunWorkspaceBinding: |
+          volumeClaimTemplate:
+            spec:
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 1Gi
