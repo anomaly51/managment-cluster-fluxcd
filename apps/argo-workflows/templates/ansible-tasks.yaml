@@ -13,7 +13,7 @@ spec:
         parameters:
           - name: master-node-ip
             valueFrom:
-              path: /workspace/master-node-ip.txt
+              path: /tmp/master-node-ip.txt
       script:
         image: alpine:3.18
         command: [sh]
@@ -47,7 +47,7 @@ spec:
             -e "target_master=~.*{{inputs.parameters.cluster-name}}-master.*" \
             -e "target_workers=~.*{{inputs.parameters.cluster-name}}-worker.*"
           MASTER_IP=$(ansible-inventory -i inventory/proxmox.yml --host {{inputs.parameters.cluster-name}}-master-01 | jq -r .ansible_host)
-          echo -n "$MASTER_IP" > /workspace/master-node-ip.txt
+          echo -n "$MASTER_IP" > /tmp/master-node-ip.txt
         volumeMounts:
           - name: workspace
             mountPath: /workspace

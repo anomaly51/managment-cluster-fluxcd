@@ -37,7 +37,7 @@ spec:
         parameters:
           - name: repo-name
             valueFrom:
-              path: /workspace/repo-name.txt
+              path: /tmp/repo-name.txt
       script:
         image: alpine/git:v2.43.0
         command: [sh]
@@ -64,7 +64,7 @@ spec:
           git commit -m "chore: initialize cluster {{inputs.parameters.cluster-name}} from template"
           git remote add origin https://${FULL_TOKEN}@github.com/anomaly51/${NEW_REPO_NAME}.git
           git push -u origin main
-          echo -n "${NEW_REPO_NAME}" > /workspace/repo-name.txt
+          echo -n "${NEW_REPO_NAME}" > /tmp/repo-name.txt
         volumeMounts:
           - name: workspace
             mountPath: /workspace
