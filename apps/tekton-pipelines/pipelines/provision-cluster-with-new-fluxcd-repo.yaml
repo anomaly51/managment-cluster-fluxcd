@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
-  name: cluster-provision-gitops
+  name: provision-cluster-with-new-fluxcd-repo
   namespace: default
 spec:
   params:
