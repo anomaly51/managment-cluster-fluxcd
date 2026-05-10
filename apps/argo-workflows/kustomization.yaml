@@ -6,8 +6,8 @@ resources:
   - base/namespace.yaml
   - base/workflow-rbac.yaml
   - https://github.com/argoproj/argo-workflows/releases/download/v3.5.5/install.yaml
-  - templates/
-  - workflows/
+  - workflows/vm-provision-template.yaml
+  - workflows/vm-destroy-template.yaml
 
 patches:
   - path: base/argo-server-patch.yaml
