@@ -78,7 +78,8 @@ spec:
                   pm_api_token_id     = "terraform@pam!terraform"
                   pm_api_token_secret = "bdcbd933-8cbf-4c6c-be85-41b0b8f74ba3"
                   pm_tls_insecure     = true
-                  pm_parallel         = 4
+                  pm_parallel         = 2
+                  pm_timeout          = 600
                 }
 
                 module "k3s_cluster" {
@@ -218,4 +219,3 @@ spec:
                 git add envs/shared/{{inputs.parameters.cluster-name}}/
                 git commit -m "feat: terraform apply and GitOps init for cluster {{inputs.parameters.cluster-name}}"
                 git push origin main
-
