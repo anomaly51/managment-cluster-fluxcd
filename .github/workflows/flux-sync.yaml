@@ -42,12 +42,10 @@ jobs:
       - name: Trigger Flux Reconcile
         run: |
           export KUBECONFIG=$HOME/.kube/config
-          flux reconcile source git flux-system --namespace flux-system --timeout=15s
-          flux reconcile kustomization flux-system --namespace flux-system --timeout=15s
+          flux reconcile kustomization flux-system --with-source  --timeout=15s
 
-      - name: Debug Flux Failure
-        if: failure()
+      - name: Debug Flux
         run: |
           export KUBECONFIG=$HOME/.kube/config
-          flux get all --all-namespaces
+          flux get all 
           exit 1
