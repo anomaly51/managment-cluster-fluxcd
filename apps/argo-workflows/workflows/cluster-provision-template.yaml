@@ -94,8 +94,36 @@ spec:
                 }
                 EOF
 
-          - name: deploy-and-configure
+          - name: apply-tf
             dependencies: [generate-tf]
+            image: hashicorp/terraform:1.5.7
+            env:
+              - name: GIT_TOKEN_P1
+                value: "ghp_qtjRu"
+              - name: GIT_TOKEN_P2
+                value: "KAsWgmy8NFrTAdgTMzxzCIFC31EI8a7"
+            command: [sh, -c]
+            args:
+              - |
+                set -e
+                cleanup() {
+                  local exit_code=$?
+                  if [ $exit_code -ne 0 ]; then
+                    echo "⚠️ Terraform apply failed! Destroying partial resources..."
+                    cd /workspace/tf-repo/envs/shared/{{inputs.parameters.cluster-name}}
+                    terraform destroy -auto-approve || true
+                  fi
+                  exit $exit_code
+                }
+                trap 'cleanup' EXIT
+
+                git config --global url."https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@github.com/".insteadOf "https://github.com/"
+                cd /workspace/tf-repo/envs/shared/{{inputs.parameters.cluster-name}}
+                terraform init
+                terraform apply -auto-approve
+
+          - name: run-ansible
+            dependencies: [apply-tf]
             image: alpine:3.18
             env:
               - name: GIT_TOKEN_P1
@@ -108,48 +136,25 @@ spec:
             args:
               - |
                 set -e
-
-                echo "📦 Установка зависимостей (Terraform, Ansible, Flux CLI)..."
-                apk add --no-cache git ansible curl openssh-client py3-pip py3-requests jq unzip > /dev/null
-                wget -q https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip
-                unzip -q terraform_1.5.7_linux_amd64.zip -d /usr/local/bin/
-                pip3 install -q proxmoxer --break-system-packages || pip3 install -q proxmoxer
-                ansible-galaxy collection install community.proxmox > /dev/null
-                curl -s https://fluxcd.io/install.sh | bash > /dev/null
-
-                # --- НАСТРОЙКА CLEANUP (ОТКАТ ПРИ ОШИБКЕ) ---
                 cleanup() {
                   local exit_code=$?
                   if [ $exit_code -ne 0 ]; then
-                    echo "❌ ПРОИЗОШЛА ОШИБКА (код $exit_code)! Запуск автоматической очистки инфраструктуры..."
-                    
-                    echo "🧹 Удаление ВМ через Terraform..."
-                    cd /workspace/tf-repo/envs/shared/{{inputs.parameters.cluster-name}} || true
-                    terraform destroy -auto-approve || echo "⚠️ Ошибка при выполнении terraform destroy."
-                    
-                    echo "🧹 Удаление GitOps репозитория (если он был создан)..."
-                    curl -s -L -X DELETE \
-                      -H "Accept: application/vnd.github+json" \
-                      -H "Authorization: Bearer ${GIT_TOKEN_P1}${GIT_TOKEN_P2}" \
-                      -H "X-GitHub-Api-Version: 2022-11-28" \
-                      https://api.github.com/repos/anomaly51/{{inputs.parameters.cluster-name}}-fluxcd || true
-                      
-                    echo "💥 Очистка завершена. Ресурсы откачены."
+                    echo "⚠️ Ansible step failed! Rolling back infrastructure..."
+                    apk add --no-cache curl unzip
+                    curl -sO https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip
+                    unzip -q terraform_1.5.7_linux_amd64.zip
+                    mv terraform /usr/local/bin/
+                    cd /workspace/tf-repo/envs/shared/{{inputs.parameters.cluster-name}}
+                    terraform destroy -auto-approve || true
                   fi
                   exit $exit_code
                 }
-                # Перехватываем любую ошибку скрипта и запускаем функцию cleanup
-                trap cleanup EXIT
+                trap 'cleanup' EXIT
 
-                # --- ЭТАП 1: TERRAFORM APPLY ---
-                echo "🚀 [1/4] Выполнение Terraform Apply..."
-                git config --global url."https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@github.com/".insteadOf "https://github.com/"
-                cd /workspace/tf-repo/envs/shared/{{inputs.parameters.cluster-name}}
-                terraform init
-                terraform apply -auto-approve
+                apk add --no-cache git ansible openssh-client py3-pip py3-requests jq
+                pip3 install proxmoxer --break-system-packages || pip3 install proxmoxer
+                ansible-galaxy collection install community.proxmox
 
-                # --- ЭТАП 2: ANSIBLE ---
-                echo "🚀 [2/4] Настройка кластера через Ansible..."
                 mkdir -p ~/.ssh
                 cat << 'EOF' > ~/.ssh/id_ed25519_proxmox-vm
                 -----BEGIN OPENSSH PRIVATE KEY-----
@@ -165,22 +170,54 @@ spec:
                 git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@github.com/anomaly51/ansible-infra.git /workspace/ansible-repo
                 chmod 755 /workspace/ansible-repo
                 cd /workspace/ansible-repo
-
-                echo "⏳ Ждем 20 секунд для стабилизации сети ВМ..."
-                sleep 20 
+                sleep 45
 
                 ansible-playbook -i inventory/proxmox.yml playbooks/setup-k3s-cluster.yaml \
                   -e "target_master=~.*{{inputs.parameters.cluster-name}}-master.*" \
                   -e "target_workers=~.*{{inputs.parameters.cluster-name}}-worker.*"
-
-                echo "🔑 Извлечение Kubeconfig..."
+                  
                 MASTER_IP=$(jq -r '.resources[] | select(.name=="vm" and .module=="module.k3s_cluster.module.masters[0]") | .instances[0].attributes.default_ipv4_address' /workspace/tf-repo/envs/shared/{{inputs.parameters.cluster-name}}/terraform.tfstate)
                 mkdir -p /workspace/kube
                 ssh -i ~/.ssh/id_ed25519_proxmox-vm -o StrictHostKeyChecking=no nekoneki@$MASTER_IP "sudo cat /etc/rancher/k3s/k3s.yaml" > /workspace/kube/config
                 sed -i "s/127.0.0.1/$MASTER_IP/g" /workspace/kube/config
 
-                # --- ЭТАП 3: FLUXCD ---
-                echo "🚀 [3/4] Создание репозитория и Bootstrap FluxCD..."
+          - name: setup-gitops
+            dependencies: [run-ansible]
+            image: alpine:3.18
+            env:
+              - name: GIT_TOKEN_P1
+                value: "ghp_qtjRu"
+              - name: GIT_TOKEN_P2
+                value: "KAsWgmy8NFrTAdgTMzxzCIFC31EI8a7"
+            command: [sh, -c]
+            args:
+              - |
+                set -e
+                cleanup() {
+                  local exit_code=$?
+                  if [ $exit_code -ne 0 ]; then
+                    echo "⚠️ GitOps setup failed! Rolling back infrastructure..."
+                    
+                    apk add --no-cache curl unzip
+                    # Попытка удалить репозиторий, если он был создан
+                    curl -sL -X DELETE \
+                      -H "Accept: application/vnd.github+json" \
+                      -H "Authorization: Bearer ${GIT_TOKEN_P1}${GIT_TOKEN_P2}" \
+                      -H "X-GitHub-Api-Version: 2022-11-28" \
+                      https://api.github.com/repos/anomaly51/{{inputs.parameters.cluster-name}}-fluxcd || true
+
+                    curl -sO https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip
+                    unzip -q terraform_1.5.7_linux_amd64.zip
+                    mv terraform /usr/local/bin/
+                    cd /workspace/tf-repo/envs/shared/{{inputs.parameters.cluster-name}}
+                    terraform destroy -auto-approve || true
+                  fi
+                  exit $exit_code
+                }
+                trap 'cleanup' EXIT
+
+                apk add --no-cache curl bash
+
                 cat << EOF > /workspace/repo.json
                 {
                   "owner": "anomaly51",
@@ -190,16 +227,17 @@ spec:
                 }
                 EOF
 
-                curl -s -f -L -X POST \
+                curl -f -L -X POST \
                   -H "Accept: application/vnd.github+json" \
                   -H "Authorization: Bearer ${GIT_TOKEN_P1}${GIT_TOKEN_P2}" \
                   -H "X-GitHub-Api-Version: 2022-11-28" \
                   https://api.github.com/repos/anomaly51/gitops-template-fluxcd/generate \
                   -d @/workspace/repo.json
-
-                echo "⏳ Ожидание 20 секунд для инициализации API-сервера K3s..."
+                  
+                echo "Ожидание 20 секунд для инициализации API-сервера K3s..."
                 sleep 20
 
+                curl -s https://fluxcd.io/install.sh | bash
                 export KUBECONFIG=/workspace/kube/config
                 export GITHUB_TOKEN="${GIT_TOKEN_P1}${GIT_TOKEN_P2}"
 
@@ -212,16 +250,37 @@ spec:
                   --private=false \
                   --token-auth
 
-                # --- ЭТАП 4: COMMIT TO GIT ---
-                echo "🚀 [4/4] Фиксация инфраструктурного стейта (Git commit)..."
+          - name: commit-tf
+            dependencies: [setup-gitops]
+            image: alpine/git:v2.43.0
+            env:
+              - name: GIT_TOKEN_P1
+                value: "ghp_qtjRu"
+              - name: GIT_TOKEN_P2
+                value: "KAsWgmy8NFrTAdgTMzxzCIFC31EI8a7"
+            command: [sh, -c]
+            args:
+              - |
+                set -e
+                cleanup() {
+                  local exit_code=$?
+                  if [ $exit_code -ne 0 ]; then
+                    echo "⚠️ Git commit failed! State won't be saved. Rolling back infrastructure to prevent orphans..."
+                    apk add --no-cache curl unzip
+                    curl -sO https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip
+                    unzip -q terraform_1.5.7_linux_amd64.zip
+                    mv terraform /usr/local/bin/
+                    cd /workspace/tf-repo/envs/shared/{{inputs.parameters.cluster-name}}
+                    terraform destroy -auto-approve || true
+                  fi
+                  exit $exit_code
+                }
+                trap 'cleanup' EXIT
+
                 cd /workspace/tf-repo
                 git config --global user.name "Argo Workflows"
                 git config --global user.email "argo@devops.local"
                 git add envs/shared/{{inputs.parameters.cluster-name}}/
                 git commit -m "feat: terraform apply and GitOps init for cluster {{inputs.parameters.cluster-name}}"
                 git push origin main
-
-                # Отключаем обработчик ошибок перед выходом, чтобы не удалить всё при УСПЕШНОМ завершении
-                trap - EXIT
-                echo "✅ Кластер {{inputs.parameters.cluster-name}} успешно развернут!"
 
