@@ -62,37 +62,7 @@ spec:
               - |
                 set -e
                 mkdir -p /workspace/tf-repo/envs/shared/{{inputs.parameters.cluster-name}}
-
-                cat << 'EOF' > /workspace/tf-repo/envs/shared/{{inputs.parameters.cluster-name}}/main.tf
-                terraform {
-                  required_providers {
-                    proxmox = {
-                      source  = "telmate/proxmox"
-                      version = "3.0.2-rc07"
-                    }
-                  }
-                }
-
-                provider "proxmox" {
-                  pm_api_url          = "https://192.168.1.35:8006/api2/json"
-                  pm_api_token_id     = "terraform@pam!terraform"
-                  pm_api_token_secret = "bdcbd933-8cbf-4c6c-be85-41b0b8f74ba3"
-                  pm_tls_insecure     = true
-                  pm_parallel         = 4
-                }
-
-                module "k3s_cluster" {
-                  source        = "../../../modules/k3s-cluster"
-                  cluster_name  = "{{inputs.parameters.cluster-name}}"
-                  proxmox_nodes = {{inputs.parameters.target-nodes}}
-                  template_name = "debian-k3s"
-                  master_count  = {{inputs.parameters.master-count}}
-                  worker_count  = {{inputs.parameters.worker-count}}
-                  cores         = {{inputs.parameters.cores}}
-                  memory        = {{inputs.parameters.memory}}
-                  disk_size     = {{inputs.parameters.disk-size}}
-                }
-                EOF
+                echo -e 'terraform {\n  required_providers {\n    proxmox = {\n      source  = "telmate/proxmox"\n      version = "3.0.2-rc07"\n    }\n  }\n}\n\nprovider "proxmox" {\n  pm_api_url          = "https://192.168.1.35:8006/api2/json"\n  pm_api_token_id     = "terraform@pam!terraform"\n  pm_api_token_secret = "bdcbd933-8cbf-4c6c-be85-41b0b8f74ba3"\n  pm_tls_insecure     = true\n  pm_parallel         = 4\n}\n\nmodule "k3s_cluster" {\n  source        = "../../../modules/k3s-cluster"\n  cluster_name  = "{{inputs.parameters.cluster-name}}"\n  proxmox_nodes = {{inputs.parameters.target-nodes}}\n  template_name = "debian-k3s"\n  master_count  = {{inputs.parameters.master-count}}\n  worker_count  = {{inputs.parameters.worker-count}}\n  cores         = {{inputs.parameters.cores}}\n  memory        = {{inputs.parameters.memory}}\n  disk_size     = {{inputs.parameters.disk-size}}\n}' > /workspace/tf-repo/envs/shared/{{inputs.parameters.cluster-name}}/main.tf
 
           - name: apply-tf
             dependencies: [generate-tf]
@@ -107,7 +77,6 @@ spec:
               - |
                 set -e
                 trap 'exit_code=$?; if [ $exit_code -ne 0 ]; then echo "⚠️ apply-tf failed! Rolling back..."; cd /workspace/tf-repo/envs/shared/{{inputs.parameters.cluster-name}} && terraform destroy -auto-approve || true; fi; exit $exit_code' EXIT
-
                 git config --global url."https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@github.com/".insteadOf "https://github.com/"
                 cd /workspace/tf-repo/envs/shared/{{inputs.parameters.cluster-name}}
                 terraform init
@@ -127,33 +96,18 @@ spec:
             args:
               - |
                 set -e
-                trap 'exit_code=$?; if [ $exit_code -ne 0 ]; then echo "⚠️ run-ansible failed! Rolling back..."; cd /workspace/tf-repo/envs/shared/{{inputs.parameters.cluster-name}} && terraform destroy -auto-approve || true; fi; exit $exit_code' EXIT
-
+                trap 'exit_code=$?; if [ $exit_code -ne 0 ]; then echo "⚠️ run-ansible failed! Destroying cluster..."; cd /workspace/tf-repo/envs/shared/{{inputs.parameters.cluster-name}} && terraform destroy -auto-approve || true; fi; exit $exit_code' EXIT
                 apk add --no-cache git ansible openssh-client py3-pip py3-requests jq
                 pip3 install proxmoxer --break-system-packages || pip3 install proxmoxer
                 ansible-galaxy collection install community.proxmox
-
                 mkdir -p ~/.ssh
-                cat << 'EOF' > ~/.ssh/id_ed25519_proxmox-vm
-                -----BEGIN OPENSSH PRIVATE KEY-----
-                b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-                QyNTUxOQAAACD5YK+hwQw+eyIBAEdg/nTJ4/Lv9iLdbqPTpKoH2lUIpwAAAJAa/POCGvzz
-                ggAAAAtzc2gtZWQyNTUxOQAAACD5YK+hwQw+eyIBAEdg/nTJ4/Lv9iLdbqPTpKoH2lUIpw
-                AAAEDIuAdzJk3z34U/O5FvZ4zh2JdiBcj2elF6RNyI0uFG6flgr6HBDD57IgEAR2D+dMnj
-                8u/2It1uo9OkqgfaVQinAAAACnByb3htb3gtdm0BAgM=
-                -----END OPENSSH PRIVATE KEY-----
-                EOF
+                echo -e "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW\nQyNTUxOQAAACD5YK+hwQw+eyIBAEdg/nTJ4/Lv9iLdbqPTpKoH2lUIpwAAAJAa/POCGvzz\nggAAAAtzc2gtZWQyNTUxOQAAACD5YK+hwQw+eyIBAEdg/nTJ4/Lv9iLdbqPTpKoH2lUIpw\nAAAEDIuAdzJk3z34U/O5FvZ4zh2JdiBcj2elF6RNyI0uFG6flgr6HBDD57IgEAR2D+dMnj\n8u/2It1uo9OkqgfaVQinAAAACnByb3htb3gtdm0BAgM=\n-----END OPENSSH PRIVATE KEY-----" > ~/.ssh/id_ed25519_proxmox-vm
                 chmod 600 ~/.ssh/id_ed25519_proxmox-vm
-
                 git clone https://${GIT_TOKEN_P1}${GIT_TOKEN_P2}@github.com/anomaly51/ansible-infra.git /workspace/ansible-repo
                 chmod 755 /workspace/ansible-repo
                 cd /workspace/ansible-repo
                 sleep 45
-
-                ansible-playbook -i inventory/proxmox.yml playbooks/setup-k3s-cluster.yaml \
-                  -e "target_master=~.*{{inputs.parameters.cluster-name}}-master.*" \
-                  -e "target_workers=~.*{{inputs.parameters.cluster-name}}-worker.*"
-                  
+                ansible-playbook -i inventory/proxmox.yml playbooks/setup-k3s-cluster.yaml -e "target_master=~.*{{inputs.parameters.cluster-name}}-master.*" -e "target_workers=~.*{{inputs.parameters.cluster-name}}-worker.*"
                 MASTER_IP=$(jq -r '.resources[] | select(.name=="vm" and .module=="module.k3s_cluster.module.masters[0]") | .instances[0].attributes.default_ipv4_address' /workspace/tf-repo/envs/shared/{{inputs.parameters.cluster-name}}/terraform.tfstate)
                 mkdir -p /workspace/kube
                 ssh -i ~/.ssh/id_ed25519_proxmox-vm -o StrictHostKeyChecking=no nekoneki@$MASTER_IP "sudo cat /etc/rancher/k3s/k3s.yaml" > /workspace/kube/config
@@ -171,41 +125,15 @@ spec:
             args:
               - |
                 set -e
-                trap 'exit_code=$?; if [ $exit_code -ne 0 ]; then echo "⚠️ setup-gitops failed! Rolling back..."; apk add --no-cache curl; curl -sL -X DELETE -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GIT_TOKEN_P1}${GIT_TOKEN_P2}" -H "X-GitHub-Api-Version: 2022-11-28" https://api.github.com/repos/anomaly51/{{inputs.parameters.cluster-name}}-fluxcd || true; cd /workspace/tf-repo/envs/shared/{{inputs.parameters.cluster-name}} && terraform destroy -auto-approve || true; fi; exit $exit_code' EXIT
-
+                trap 'exit_code=$?; if [ $exit_code -ne 0 ]; then echo "⚠️ setup-gitops failed! Destroying cluster..."; apk add --no-cache curl; curl -sL -X DELETE -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GIT_TOKEN_P1}${GIT_TOKEN_P2}" https://api.github.com/repos/anomaly51/{{inputs.parameters.cluster-name}}-fluxcd || true; cd /workspace/tf-repo/envs/shared/{{inputs.parameters.cluster-name}} && terraform destroy -auto-approve || true; fi; exit $exit_code' EXIT
                 apk add --no-cache curl bash
-
-                cat << EOF > /workspace/repo.json
-                {
-                  "owner": "anomaly51",
-                  "name": "{{inputs.parameters.cluster-name}}-fluxcd",
-                  "include_all_branches": false,
-                  "private": false
-                }
-                EOF
-
-                curl -f -L -X POST \
-                  -H "Accept: application/vnd.github+json" \
-                  -H "Authorization: Bearer ${GIT_TOKEN_P1}${GIT_TOKEN_P2}" \
-                  -H "X-GitHub-Api-Version: 2022-11-28" \
-                  https://api.github.com/repos/anomaly51/gitops-template-fluxcd/generate \
-                  -d @/workspace/repo.json
-                  
-                echo "Waiting 20s for K3s API initialization..."
+                echo -e '{\n  "owner": "anomaly51",\n  "name": "{{inputs.parameters.cluster-name}}-fluxcd",\n  "include_all_branches": false,\n  "private": false\n}' > /workspace/repo.json
+                curl -f -L -X POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GIT_TOKEN_P1}${GIT_TOKEN_P2}" -H "X-GitHub-Api-Version: 2022-11-28" https://api.github.com/repos/anomaly51/gitops-template-fluxcd/generate -d @/workspace/repo.json
                 sleep 20
-
                 curl -s https://fluxcd.io/install.sh | bash
                 export KUBECONFIG=/workspace/kube/config
                 export GITHUB_TOKEN="${GIT_TOKEN_P1}${GIT_TOKEN_P2}"
-
-                flux bootstrap github \
-                  --owner=anomaly51 \
-                  --repository={{inputs.parameters.cluster-name}}-fluxcd \
-                  --branch=main \
-                  --path=cluster \
-                  --personal=true \
-                  --private=false \
-                  --token-auth
+                flux bootstrap github --owner=anomaly51 --repository={{inputs.parameters.cluster-name}}-fluxcd --branch=main --path=cluster --personal=true --private=false --token-auth
 
           - name: commit-tf
             dependencies: [setup-gitops]
@@ -219,8 +147,7 @@ spec:
             args:
               - |
                 set -e
-                trap 'exit_code=$?; if [ $exit_code -ne 0 ]; then echo "⚠️ commit-tf failed! Rolling back..."; cd /workspace/tf-repo/envs/shared/{{inputs.parameters.cluster-name}} && terraform destroy -auto-approve || true; fi; exit $exit_code' EXIT
-
+                trap 'exit_code=$?; if [ $exit_code -ne 0 ]; then echo "⚠️ commit-tf failed! Destroying cluster..."; cd /workspace/tf-repo/envs/shared/{{inputs.parameters.cluster-name}} && terraform destroy -auto-approve || true; fi; exit $exit_code' EXIT
                 apk add --no-cache git
                 cd /workspace/tf-repo
                 git config --global user.name "Argo Workflows"
